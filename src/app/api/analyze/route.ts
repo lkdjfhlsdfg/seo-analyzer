@@ -4,12 +4,25 @@ import type { NextRequest } from 'next/server';
 // Environment variables
 const PAGESPEED_API_KEY = process.env.GOOGLE_PAGESPEED_API_KEY;
 
+function isValidUrl(urlString: string): boolean {
+  try {
+    new URL(urlString);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 interface AuditItem {
   url: string;
   [key: string]: any;
 }
 
 async function getPageSpeedData(url: string) {
+  if (!PAGESPEED_API_KEY) {
+    throw new Error('PageSpeed API key is not configured');
+  }
+
   try {
     const response = await fetch(
       `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile`
@@ -21,6 +34,10 @@ async function getPageSpeedData(url: string) {
 
     const data = await response.json();
     
+    if (!data.lighthouseResult) {
+      throw new Error('Invalid response from PageSpeed API');
+    }
+
     const {
       lighthouseResult: {
         categories,
@@ -189,7 +206,20 @@ async function getPageSpeedData(url: string) {
 export async function POST(request: NextRequest) {
   try {
     const { prompt } = await request.json();
-    const url = prompt.replace('Analyze this URL: ', '').trim();
+    let url = prompt.replace('Analyze this URL: ', '').trim();
+
+    // Add https:// if no protocol is specified
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+
+    // Validate URL
+    if (!isValidUrl(url)) {
+      return NextResponse.json(
+        { error: 'Invalid URL provided' },
+        { status: 400 }
+      );
+    }
 
     // Get performance and SEO data
     const pageSpeedData = await getPageSpeedData(url);
@@ -197,10 +227,10 @@ export async function POST(request: NextRequest) {
     // Combine all analysis results
     const analysisResult = {
       score: {
-        overall: Math.round((pageSpeedData.performanceScore + pageSpeedData.seoScore + pageSpeedData.accessibilityScore) / 3),
+        overall: Math.round((pageSpeedData.performanceScore + pageSpeedData.seoScore) / 2),
         technical: pageSpeedData.performanceScore,
         content: pageSpeedData.seoScore,
-        backlinks: 5 // Placeholder until Moz API is integrated
+        backlinks: 5 // Placeholder
       },
       issues: pageSpeedData.issues
     };
