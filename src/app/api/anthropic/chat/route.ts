@@ -1,5 +1,5 @@
 import { Anthropic } from '@anthropic-ai/sdk';
-import { StreamingTextResponse, Message } from 'ai';
+import { StreamingTextResponse } from 'ai';
 
 export const runtime = "edge";
 
