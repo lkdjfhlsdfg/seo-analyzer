@@ -19,38 +19,34 @@ interface AuditItem {
 }
 
 async function getPageSpeedData(url: string) {
-  if (!PAGESPEED_API_KEY || PAGESPEED_API_KEY === 'your_pagespeed_key_here') {
-    console.error('PageSpeed API key is not properly configured');
-    throw new Error('PageSpeed API key is not properly configured. Please check your environment variables.');
-  }
-
   try {
     const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile`;
-    console.log('Calling PageSpeed API:', url);
+    
+    console.log('Calling PageSpeed API for URL:', url);
     
     const response = await fetch(apiUrl);
+    const responseText = await response.text(); // Get raw response text first
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('PageSpeed API error response:', {
+      console.error('PageSpeed API error:', {
         status: response.status,
         statusText: response.statusText,
-        errorText,
-        url
+        responseText,
+        url: apiUrl.replace(PAGESPEED_API_KEY || '', '***') // Log URL without API key
       });
-      throw new Error(`Failed to analyze website (${response.status}): ${response.statusText}`);
+      throw new Error(`PageSpeed API error (${response.status}): ${responseText}`);
     }
 
     let data;
     try {
-      data = await response.json();
+      data = JSON.parse(responseText);
     } catch (e) {
-      console.error('Failed to parse PageSpeed API response:', e);
+      console.error('Failed to parse PageSpeed API response:', e, 'Response text:', responseText);
       throw new Error('Invalid response from PageSpeed API: Failed to parse JSON');
     }
-    
+
     if (!data.lighthouseResult) {
-      console.error('Missing lighthouse result:', data);
+      console.error('Missing lighthouse result in response:', data);
       throw new Error('Invalid response from PageSpeed API: Missing lighthouse result');
     }
 
@@ -62,20 +58,21 @@ async function getPageSpeedData(url: string) {
       }
     } = data;
 
-    const performanceScore = Math.round(categories.performance.score * 10);
-    const seoScore = Math.round(categories.seo.score * 10);
-    const accessibilityScore = Math.round(categories.accessibility.score * 10);
-    
+    // Default scores if categories are missing
+    const performanceScore = categories.performance ? Math.round(categories.performance.score * 10) : 5;
+    const seoScore = categories.seo ? Math.round(categories.seo.score * 10) : 5;
+    const accessibilityScore = categories.accessibility ? Math.round(categories.accessibility.score * 10) : 5;
+
     const issues = [];
     
     // Core Web Vitals analysis
     const coreWebVitals = {
-      LCP: audits['largest-contentful-paint'].numericValue,
-      FID: audits['first-input-delay'] ? audits['first-input-delay'].numericValue : null,
-      CLS: audits['cumulative-layout-shift'].numericValue,
-      FCP: audits['first-contentful-paint'].numericValue,
-      TTI: audits['interactive'].numericValue,
-      TBT: audits['total-blocking-time'].numericValue
+      LCP: audits['largest-contentful-paint']?.numericValue ?? 0,
+      FID: audits['first-input-delay']?.numericValue ?? 0,
+      CLS: audits['cumulative-layout-shift']?.numericValue ?? 0,
+      FCP: audits['first-contentful-paint']?.numericValue ?? 0,
+      TTI: audits['interactive']?.numericValue ?? 0,
+      TBT: audits['total-blocking-time']?.numericValue ?? 0
     };
 
     // Performance issues
@@ -213,9 +210,9 @@ async function getPageSpeedData(url: string) {
       accessibilityScore,
       issues
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('PageSpeed API Error:', error);
-    throw new Error('Failed to analyze page speed');
+    throw new Error(`Failed to analyze page speed: ${error.message}`);
   }
 }
 
@@ -236,6 +233,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    console.log('Starting analysis for URL:', url);
 
     // Get performance and SEO data
     const pageSpeedData = await getPageSpeedData(url);
