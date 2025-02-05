@@ -1,76 +1,94 @@
 import React, { useState, useRef } from "react";
-import { Image as ImageIcon, X } from "lucide-react";
 import Image from "next/image";
 
 interface ImageUploadProps {
-  onImageChange: (file: File | null) => void;
+  onImageSelect: (file: File) => void;
+  className?: string;
 }
 
-export default function ImageUpload({ onImageChange }: ImageUploadProps) {
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+export default function ImageUpload({ onImageSelect, className = "" }: ImageUploadProps) {
+  const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      onImageChange(file);
+      onImageSelect(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result as string);
+        setPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const removeImage = () => {
-    onImageChange(null);
-    setImagePreview(null);
+  const handleRemoveImage = () => {
+    setPreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
   return (
-    <div className="flex items-center justify-center w-full">
-      {imagePreview ? (
-        <div className="relative w-full h-64">
-          <Image
-            src={imagePreview}
-            alt="Preview"
-            layout="fill"
-            objectFit="cover"
-            className="rounded-lg"
-          />
-          <button
-            type="button"
-            onClick={removeImage}
-            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"
-          >
-            <X size={20} />
-          </button>
-        </div>
-      ) : (
-        <label
-          htmlFor="image"
-          className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-        >
-          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            <ImageIcon className="w-10 h-10 mb-3 text-gray-400" />
-            <p className="mb-2 text-sm text-gray-500">
-              <span className="font-semibold">Click to upload</span> or drag and drop
-            </p>
-            <p className="text-xs text-gray-500">PNG, JPG or GIF (MAX. 800x400px)</p>
-          </div>
-        </label>
-      )}
+    <div className={`relative ${className}`}>
       <input
         type="file"
-        id="image"
         accept="image/*"
-        onChange={handleImageChange}
-        className="hidden"
+        onChange={handleImageSelect}
         ref={fileInputRef}
+        className="hidden"
+        id="image-upload"
       />
+      
+      {!preview ? (
+        <label
+          htmlFor="image-upload"
+          className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors"
+        >
+          <svg 
+            className="w-8 h-8 text-gray-400 mb-2" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" 
+            />
+          </svg>
+          <span className="text-sm text-gray-500">Click to upload an image</span>
+        </label>
+      ) : (
+        <div className="relative">
+          <Image
+            src={preview}
+            alt="Preview"
+            width={300}
+            height={200}
+            className="rounded-lg object-cover"
+          />
+          <button
+            onClick={handleRemoveImage}
+            className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
+          >
+            <svg 
+              className="w-4 h-4 text-gray-600" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M6 18L18 6M6 6l12 12" 
+              />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
