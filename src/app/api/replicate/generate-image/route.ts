@@ -1,37 +1,34 @@
-import { NextResponse } from "next/server";
-import Replicate from "replicate";
+import Replicate from 'replicate';
+import { NextResponse } from 'next/server';
 
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-});
+export const runtime = 'edge';
 
-export async function POST(request: Request) {
-  if (!process.env.REPLICATE_API_TOKEN) {
-    throw new Error(
-      "The REPLICATE_API_TOKEN environment variable is not set. See README.md for instructions on how to set it."
-    );
-  }
-
-  const { prompt } = await request.json();
-
+export async function POST(req: Request) {
   try {
+    const { prompt } = await req.json();
+
+    const replicate = new Replicate({
+      auth: process.env.REPLICATE_API_TOKEN,
+    });
+
     const output = await replicate.run(
-      "stability-ai/stable-diffusion:db21e45d3f7023abc2a46ee38a23973f6dce16bb082a930b0c49861f96d1e5bf",
+      "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
       {
         input: {
           prompt: prompt,
-          image_dimensions: "512x512",
-          num_outputs: 1,
-          num_inference_steps: 50,
-          guidance_scale: 7.5,
-          scheduler: "DPMSolverMultistep",
-        },
+          negative_prompt: "low quality, bad anatomy, blurry",
+          width: 1024,
+          height: 1024,
+        }
       }
     );
 
-    return NextResponse.json({ output }, { status: 200 });
+    return NextResponse.json({ output });
   } catch (error) {
-    console.error("Error from Replicate API:", error);
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+    console.error('Replicate API Error:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate image' },
+      { status: 500 }
+    );
   }
 }
