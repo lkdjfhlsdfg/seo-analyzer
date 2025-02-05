@@ -79,27 +79,23 @@ export default function Home() {
   };
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let newUrl = e.target.value.trim();
-    if (newUrl.startsWith('@')) {
-      newUrl = newUrl.substring(1);
-    }
+    const newUrl = e.target.value;
     setUrl(newUrl);
-    setError('');
+    if (error) setError(''); // Clear error when user starts typing
   };
 
   const handleAnalysis = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setAnalysisResult(null);
-    setIsAnalyzing(true);
     
     if (!url) {
       setError('Please enter a website URL');
-      setIsAnalyzing(false);
       return;
     }
 
     try {
+      setError('');
+      setIsAnalyzing(true);
+      
       let processedUrl = url.trim();
       if (!processedUrl.match(/^https?:\/\//i)) {
         processedUrl = 'https://' + processedUrl;
@@ -169,6 +165,7 @@ export default function Home() {
     } catch (err: any) {
       console.error('Error during analysis:', err);
       setError(err.message || 'An error occurred during analysis. Please try again.');
+      setAnalysisResult(null);
     } finally {
       setIsAnalyzing(false);
     }
