@@ -221,27 +221,34 @@ async function getPageSpeedData(url: string) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('Analyze API route called');
   try {
-    const { prompt } = await request.json();
+    const body = await request.json();
+    console.log('Request body:', body);
+    
+    const { prompt } = body;
     let url = prompt.replace('Analyze this URL: ', '').trim();
+    console.log('Extracted URL:', url);
 
     // Add https:// if no protocol is specified
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
+      console.log('Added https://, new URL:', url);
     }
 
     // Validate URL
     if (!isValidUrl(url)) {
+      console.error('Invalid URL provided:', url);
       return NextResponse.json(
         { error: 'Invalid URL provided' },
         { status: 400 }
       );
     }
 
-    console.log('Starting analysis for URL:', url);
-
+    console.log('Starting PageSpeed analysis for URL:', url);
     // Get performance and SEO data
     const pageSpeedData = await getPageSpeedData(url);
+    console.log('PageSpeed analysis complete:', pageSpeedData);
 
     // Combine all analysis results
     const analysisResult = {
@@ -254,6 +261,7 @@ export async function POST(request: NextRequest) {
       issues: pageSpeedData.issues
     };
 
+    console.log('Sending analysis result:', analysisResult);
     return NextResponse.json(analysisResult);
   } catch (error: any) {
     console.error('Analysis error:', error);

@@ -86,6 +86,7 @@ export default function Home() {
 
   const handleAnalysis = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted with URL:', url);
     
     if (!url) {
       setError('Please enter a website URL');
@@ -95,13 +96,16 @@ export default function Home() {
     try {
       setError('');
       setIsAnalyzing(true);
+      console.log('Starting analysis...');
       
       let processedUrl = url.trim();
       if (!processedUrl.match(/^https?:\/\//i)) {
         processedUrl = 'https://' + processedUrl;
       }
+      console.log('Processed URL:', processedUrl);
 
       // Get PageSpeed analysis
+      console.log('Calling PageSpeed API...');
       const pageSpeedResponse = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
@@ -112,21 +116,26 @@ export default function Home() {
         }),
       });
 
+      console.log('PageSpeed API response status:', pageSpeedResponse.status);
       let pageSpeedData;
       try {
-        pageSpeedData = await pageSpeedResponse.json();
+        const responseText = await pageSpeedResponse.text();
+        console.log('PageSpeed API raw response:', responseText);
+        pageSpeedData = JSON.parse(responseText);
       } catch (e) {
         console.error('Failed to parse PageSpeed response:', e);
         throw new Error('Failed to analyze website. Please try again.');
       }
 
       if (!pageSpeedResponse.ok) {
+        console.error('PageSpeed API error:', pageSpeedData);
         throw new Error(pageSpeedData.error || 'Failed to analyze website');
       }
 
       // Get Search Console data
       let searchConsoleData;
       try {
+        console.log('Calling Search Console API...');
         const searchConsoleResponse = await fetch('/api/search-console', {
           method: 'POST',
           headers: {
@@ -139,6 +148,7 @@ export default function Home() {
         
         if (searchConsoleResponse.ok) {
           searchConsoleData = await searchConsoleResponse.json();
+          console.log('Search Console data:', searchConsoleData);
         }
       } catch (error) {
         console.error('Search Console error:', error);
@@ -146,6 +156,7 @@ export default function Home() {
       }
 
       // Combine results
+      console.log('Combining results...');
       const analysisResult = {
         ...pageSpeedData,
         searchConsole: searchConsoleData,
@@ -155,6 +166,7 @@ export default function Home() {
         },
       };
 
+      console.log('Setting analysis result:', analysisResult);
       setAnalysisResult(analysisResult);
       
       // Open the first section by default
@@ -167,6 +179,7 @@ export default function Home() {
       setError(err.message || 'An error occurred during analysis. Please try again.');
       setAnalysisResult(null);
     } finally {
+      console.log('Analysis complete');
       setIsAnalyzing(false);
     }
   };
