@@ -3,6 +3,10 @@ import type { NextRequest } from 'next/server';
 
 const SEARCH_CONSOLE_API_KEY = process.env.GOOGLE_SEARCH_CONSOLE_API_KEY;
 
+// Cache duration constants
+const CACHE_MAX_AGE = 3600; // 1 hour
+const STALE_WHILE_REVALIDATE = 600; // 10 minutes
+
 interface SearchAnalyticsData {
   clicks: number;
   impressions: number;
@@ -24,7 +28,7 @@ interface SearchAnalyticsData {
   }>;
 }
 
-async function getSearchAnalytics(url: string): Promise<SearchAnalyticsData> {
+async function getSearchAnalytics(url: string, signal?: AbortSignal): Promise<SearchAnalyticsData> {
   if (!SEARCH_CONSOLE_API_KEY) {
     throw new Error('Search Console API key is not configured');
   }
@@ -47,6 +51,7 @@ async function getSearchAnalytics(url: string): Promise<SearchAnalyticsData> {
           endDate,
           dimensions: [],
         }),
+        signal
       }
     );
 
@@ -72,6 +77,7 @@ async function getSearchAnalytics(url: string): Promise<SearchAnalyticsData> {
           dimensions: ['query'],
           rowLimit: 10,
         }),
+        signal
       }
     );
 
@@ -97,6 +103,7 @@ async function getSearchAnalytics(url: string): Promise<SearchAnalyticsData> {
           dimensions: ['page'],
           rowLimit: 10,
         }),
+        signal
       }
     );
 
@@ -119,24 +126,53 @@ async function getSearchAnalytics(url: string): Promise<SearchAnalyticsData> {
 }
 
 export async function POST(request: NextRequest) {
+  // Set caching headers for CDN/Edge caching
+  const headers = new Headers({
+    'Cache-Control': `s-maxage=${CACHE_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+    'Content-Type': 'application/json',
+  });
+
   try {
     const { url } = await request.json();
+    console.log('Search Console API called for URL:', url);
 
     if (!url) {
-      return NextResponse.json(
-        { error: 'URL is required' },
-        { status: 400 }
+      return new NextResponse(
+        JSON.stringify({ error: 'URL is required' }),
+        { status: 400, headers }
       );
     }
 
-    const searchData = await getSearchAnalytics(url);
+    // Set a timeout for the Search Console API call
+    const timeoutMs = 8000; // 8 seconds to allow for processing time
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    return NextResponse.json(searchData);
+    try {
+      const searchData = await getSearchAnalytics(url, controller.signal);
+      clearTimeout(timeoutId);
+
+      return new NextResponse(JSON.stringify(searchData), { headers });
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        return new NextResponse(
+          JSON.stringify({ 
+            error: 'Analysis is taking longer than expected. Please try again.',
+            retry: true
+          }),
+          { status: 408, headers }
+        );
+      }
+      throw error;
+    }
   } catch (error: any) {
     console.error('Search Console analysis error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to analyze search data' },
-      { status: 500 }
+    return new NextResponse(
+      JSON.stringify({ 
+        error: error.message || 'Failed to analyze search data',
+        retry: error.message?.includes('timeout') || error.message?.includes('abort')
+      }),
+      { status: 500, headers }
     );
   }
 } 

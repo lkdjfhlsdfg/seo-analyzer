@@ -4,6 +4,10 @@ import type { NextRequest } from 'next/server';
 // Environment variables
 const PAGESPEED_API_KEY = process.env.GOOGLE_PAGESPEED_API_KEY;
 
+// Cache duration constants
+const CACHE_MAX_AGE = 60; // 1 minute
+const STALE_WHILE_REVALIDATE = 30; // 30 seconds
+
 function isValidUrl(urlString: string): boolean {
   try {
     new URL(urlString);
@@ -18,7 +22,7 @@ interface AuditItem {
   [key: string]: any;
 }
 
-async function getPageSpeedData(url: string) {
+async function getPageSpeedData(url: string, signal?: AbortSignal) {
   try {
     const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile`;
     
@@ -27,7 +31,8 @@ async function getPageSpeedData(url: string) {
     const response = await fetch(apiUrl, {
       headers: {
         'Referer': process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
-      }
+      },
+      signal // Add abort signal to the fetch call
     });
     const responseText = await response.text(); // Get raw response text first
     
@@ -222,14 +227,20 @@ async function getPageSpeedData(url: string) {
 
 export async function POST(request: NextRequest) {
   console.log('Analyze API route called');
+  
+  // Set caching headers for CDN/Edge caching
+  const headers = new Headers({
+    'Cache-Control': `s-maxage=${CACHE_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+    'Content-Type': 'application/json',
+  });
+
   try {
     const body = await request.json();
     console.log('Request body:', body);
     
     const { prompt } = body;
     let url = prompt.replace('Analyze this URL: ', '').trim();
-    console.log('Extracted URL:', url);
-
+    
     // Add https:// if no protocol is specified
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
@@ -239,35 +250,54 @@ export async function POST(request: NextRequest) {
     // Validate URL
     if (!isValidUrl(url)) {
       console.error('Invalid URL provided:', url);
-      return NextResponse.json(
-        { error: 'Invalid URL provided' },
-        { status: 400 }
+      return new NextResponse(
+        JSON.stringify({ error: 'Invalid URL provided' }),
+        { status: 400, headers }
       );
     }
 
-    console.log('Starting PageSpeed analysis for URL:', url);
-    // Get performance and SEO data
-    const pageSpeedData = await getPageSpeedData(url);
-    console.log('PageSpeed analysis complete:', pageSpeedData);
+    // Set a timeout for the PageSpeed API call
+    const timeoutMs = 8000; // 8 seconds to allow for processing time
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    // Combine all analysis results
-    const analysisResult = {
-      score: {
-        overall: Math.round((pageSpeedData.performanceScore + pageSpeedData.seoScore) / 2),
-        technical: pageSpeedData.performanceScore,
-        content: pageSpeedData.seoScore,
-        backlinks: 5 // Placeholder
-      },
-      issues: pageSpeedData.issues
-    };
+    try {
+      console.log('Starting PageSpeed analysis for URL:', url);
+      const pageSpeedData = await getPageSpeedData(url, controller.signal);
+      clearTimeout(timeoutId);
+      console.log('PageSpeed analysis complete:', pageSpeedData);
 
-    console.log('Sending analysis result:', analysisResult);
-    return NextResponse.json(analysisResult);
+      const analysisResult = {
+        score: {
+          overall: Math.round((pageSpeedData.performanceScore + pageSpeedData.seoScore) / 2),
+          technical: pageSpeedData.performanceScore,
+          content: pageSpeedData.seoScore,
+          backlinks: 5
+        },
+        issues: pageSpeedData.issues
+      };
+
+      return new NextResponse(JSON.stringify(analysisResult), { headers });
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        return new NextResponse(
+          JSON.stringify({ 
+            error: 'Analysis is taking longer than expected. Please try again.',
+            retry: true
+          }),
+          { status: 408, headers }
+        );
+      }
+      throw error;
+    }
   } catch (error: any) {
     console.error('Analysis error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to analyze website' },
-      { status: 500 }
+    return new NextResponse(
+      JSON.stringify({ 
+        error: error.message || 'Failed to analyze website',
+        retry: error.message?.includes('timeout') || error.message?.includes('abort')
+      }),
+      { status: 500, headers }
     );
   }
 }
