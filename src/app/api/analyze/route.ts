@@ -24,8 +24,8 @@ interface AuditItem {
 
 async function getPageSpeedData(url: string, signal?: AbortSignal) {
   try {
-    // Only request essential categories and audits to reduce response time
-    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile&category=performance&category=seo&fields=lighthouseResult.categories.performance.score,lighthouseResult.categories.seo.score,lighthouseResult.audits.largest-contentful-paint,lighthouseResult.audits.first-contentful-paint,lighthouseResult.audits.speed-index,lighthouseResult.audits.meta-description,lighthouseResult.audits.document-title,lighthouseResult.audits.robots-txt`;
+    // Simplified API request with correct fields parameter
+    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile&category=performance&category=seo`;
     
     console.log('Calling PageSpeed API for URL:', url);
     
@@ -36,13 +36,17 @@ async function getPageSpeedData(url: string, signal?: AbortSignal) {
       signal
     });
 
-    if (!response.ok) {
-      throw new Error(`PageSpeed API error (${response.status})`);
-    }
-
     const data = await response.json();
 
+    // Check for API error response
+    if (!response.ok) {
+      const errorMessage = data.error?.message || `PageSpeed API error (${response.status})`;
+      console.error('PageSpeed API error details:', data.error);
+      throw new Error(errorMessage);
+    }
+
     if (!data.lighthouseResult) {
+      console.error('Invalid API response:', data);
       throw new Error('Invalid response from PageSpeed API: Missing lighthouse result');
     }
 
@@ -53,16 +57,20 @@ async function getPageSpeedData(url: string, signal?: AbortSignal) {
       }
     } = data;
 
-    // Calculate basic scores
-    const performanceScore = categories.performance ? Math.round(categories.performance.score * 10) : 5;
-    const seoScore = categories.seo ? Math.round(categories.seo.score * 10) : 5;
+    // Calculate basic scores with fallbacks
+    const performanceScore = categories?.performance?.score 
+      ? Math.round(categories.performance.score * 10) 
+      : 5;
+    const seoScore = categories?.seo?.score 
+      ? Math.round(categories.seo.score * 10) 
+      : 5;
 
     const issues = [];
     
     // Quick performance check
     if (performanceScore < 9) {
-      const lcp = audits['largest-contentful-paint']?.numericValue ?? 0;
-      const fcp = audits['first-contentful-paint']?.numericValue ?? 0;
+      const lcp = audits?.['largest-contentful-paint']?.numericValue ?? 0;
+      const fcp = audits?.['first-contentful-paint']?.numericValue ?? 0;
       
       issues.push({
         category: 'technical',
@@ -81,9 +89,9 @@ async function getPageSpeedData(url: string, signal?: AbortSignal) {
 
     // Quick SEO check
     const seoIssues = [];
-    if (!audits['meta-description']?.score) seoIssues.push('Add meta descriptions');
-    if (!audits['document-title']?.score) seoIssues.push('Add proper title tags');
-    if (!audits['robots-txt']?.score) seoIssues.push('Check robots.txt');
+    if (!audits?.['meta-description']?.score) seoIssues.push('Add meta descriptions');
+    if (!audits?.['document-title']?.score) seoIssues.push('Add proper title tags');
+    if (!audits?.['robots-txt']?.score) seoIssues.push('Check robots.txt');
 
     if (seoIssues.length > 0) {
       issues.push({
@@ -133,6 +141,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!PAGESPEED_API_KEY) {
+      console.error('PageSpeed API key is not configured');
+      return new NextResponse(
+        JSON.stringify({ 
+          error: 'Service configuration error',
+          quick_score: {
+            overall: 5,
+            technical: 5,
+            content: 5
+          }
+        }),
+        { status: 500, headers }
+      );
+    }
+
     // Single attempt with a strict timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
@@ -167,7 +190,23 @@ export async function POST(request: NextRequest) {
           { status: 408, headers }
         );
       }
-      throw error;
+      
+      // Handle specific API errors
+      const errorMessage = error.message.includes('PageSpeed API error') 
+        ? 'Failed to analyze website. Please check the URL and try again.'
+        : error.message;
+
+      return new NextResponse(
+        JSON.stringify({ 
+          error: errorMessage,
+          quick_score: {
+            overall: 5,
+            technical: 5,
+            content: 5
+          }
+        }),
+        { status: 500, headers }
+      );
     }
   } catch (error: any) {
     console.error('Analysis error:', error);
