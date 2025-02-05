@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
 type AnalysisHistory = {
@@ -64,17 +65,19 @@ export default function ProfilePage() {
         <div className="max-w-4xl mx-auto">
           {/* Profile Header */}
           <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
-            <div className="flex items-center space-x-4">
-              {user.picture && (
-                <img
+            <div className="flex items-center space-x-4 mb-6">
+              {user?.picture && (
+                <Image
                   src={user.picture}
                   alt="Profile"
-                  className="w-16 h-16 rounded-full"
+                  width={64}
+                  height={64}
+                  className="rounded-full"
                 />
               )}
               <div>
-                <h1 className="text-2xl font-bold">{user.name}</h1>
-                <p className="text-gray-600">{user.email}</p>
+                <h2 className="text-2xl font-bold">{user?.name}</h2>
+                <p className="text-gray-600">{user?.email}</p>
               </div>
             </div>
           </div>
