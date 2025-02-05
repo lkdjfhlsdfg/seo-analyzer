@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import LoadingSpinner from '@/components/LoadingSpinner';
+import { useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useClient } from './hooks/useClient';
 import Image from 'next/image';
 
 type AnalysisSection = {
@@ -56,13 +57,13 @@ type SEOResult = {
   searchConsole?: SearchConsoleData;
 };
 
-export default function Home() {
-  const [isClient, setIsClient] = useState(false);
-  
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+// Dynamically import components that need window
+const LoadingSpinner = dynamic(() => import('@/components/LoadingSpinner'), {
+  ssr: false,
+});
 
+export default function Home() {
+  const isClient = useClient();
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
   const [analysisResult, setAnalysisResult] = useState<SEOResult | null>(null);
@@ -75,6 +76,13 @@ export default function Home() {
     { id: 'backlinks', title: 'Backlink Profile', isOpen: false },
     { id: 'local', title: 'Local SEO', isOpen: false },
   ]);
+
+  // Only render the main content when on client-side
+  if (!isClient) {
+    return <div className="min-h-screen bg-[#F5F2EA] flex items-center justify-center">
+      <LoadingSpinner />
+    </div>;
+  }
 
   const toggleSection = (sectionId: string) => {
     setSections(sections.map(section => 
@@ -189,11 +197,6 @@ export default function Home() {
       setIsAnalyzing(false);
     }
   };
-
-  // Wrap the return in a client-side check
-  if (!isClient) {
-    return <LoadingSpinner />;
-  }
 
   return (
     <main className="min-h-screen bg-[#F5F2EA] text-[#2D2D2D]">
