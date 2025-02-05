@@ -19,7 +19,6 @@
     "postcss": "8.4.33",
     "autoprefixer": "10.4.17",
     "openai": "^4.28.0",
-    "replicate": "^0.25.1",
     "@anthropic-ai/sdk": "^0.17.1",
     "deepgram": "^1.0.3",
     "firebase": "^10.8.0"
