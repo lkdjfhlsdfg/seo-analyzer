@@ -29,13 +29,22 @@ async function getPageSpeedData(url: string) {
     );
     
     if (!response.ok) {
-      throw new Error(`PageSpeed API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('PageSpeed API error response:', errorText);
+      throw new Error(`Failed to analyze website: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      console.error('Failed to parse PageSpeed API response:', e);
+      throw new Error('Invalid response from PageSpeed API');
+    }
     
     if (!data.lighthouseResult) {
-      throw new Error('Invalid response from PageSpeed API');
+      console.error('Missing lighthouse result:', data);
+      throw new Error('Invalid response from PageSpeed API: Missing lighthouse result');
     }
 
     const {

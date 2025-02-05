@@ -91,13 +91,19 @@ export default function Home() {
         }),
       });
 
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        console.error('Failed to parse error response:', e);
+        throw new Error('Failed to analyze website. Please try again.');
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to analyze website');
       }
 
-      const data = await response.json();
-      setAnalysisResult(data);
+      setAnalysisResult(errorData);
       
       // Open the first section by default
       setSections(sections.map((section, index) => ({
@@ -106,7 +112,7 @@ export default function Home() {
       })));
     } catch (err: any) {
       console.error('Error during analysis:', err);
-      setError(err.message || 'An error occurred during analysis');
+      setError(err.message || 'An error occurred during analysis. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
