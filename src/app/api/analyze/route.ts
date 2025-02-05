@@ -19,19 +19,26 @@ interface AuditItem {
 }
 
 async function getPageSpeedData(url: string) {
-  if (!PAGESPEED_API_KEY) {
-    throw new Error('PageSpeed API key is not configured');
+  if (!PAGESPEED_API_KEY || PAGESPEED_API_KEY === 'your_pagespeed_key_here') {
+    console.error('PageSpeed API key is not properly configured');
+    throw new Error('PageSpeed API key is not properly configured. Please check your environment variables.');
   }
 
   try {
-    const response = await fetch(
-      `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile`
-    );
+    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile`;
+    console.log('Calling PageSpeed API:', url);
+    
+    const response = await fetch(apiUrl);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('PageSpeed API error response:', errorText);
-      throw new Error(`Failed to analyze website: ${response.status} ${response.statusText}`);
+      console.error('PageSpeed API error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        url
+      });
+      throw new Error(`Failed to analyze website (${response.status}): ${response.statusText}`);
     }
 
     let data;
@@ -39,7 +46,7 @@ async function getPageSpeedData(url: string) {
       data = await response.json();
     } catch (e) {
       console.error('Failed to parse PageSpeed API response:', e);
-      throw new Error('Invalid response from PageSpeed API');
+      throw new Error('Invalid response from PageSpeed API: Failed to parse JSON');
     }
     
     if (!data.lighthouseResult) {
