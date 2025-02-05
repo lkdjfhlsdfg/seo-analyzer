@@ -415,10 +415,7 @@ export default function Home() {
                 })}
               </div>
 
-              <div className="mt-8 flex justify-between items-center">
-                <button className="bg-[#F26B3A] text-white px-6 py-3 rounded-md hover:bg-[#E25A29] transition-colors">
-                  Download Full Report
-                </button>
+              <div className="mt-8 flex justify-end items-center">
                 <button className="text-[#F26B3A] hover:text-[#E25A29] transition-colors">
                   Schedule Regular Scans →
                 </button>
