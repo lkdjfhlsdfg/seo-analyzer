@@ -15,6 +15,28 @@ type SEOScore = {
   technical: number;
   content: number;
   backlinks: number;
+  searchVisibility?: number;
+};
+
+type SearchConsoleData = {
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+  queries: Array<{
+    query: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }>;
+  pages: Array<{
+    page: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }>;
 };
 
 type SEOIssue = {
@@ -31,6 +53,7 @@ type SEOIssue = {
 type SEOResult = {
   score: SEOScore;
   issues: SEOIssue[];
+  searchConsole?: SearchConsoleData;
 };
 
 export default function Home() {
@@ -42,6 +65,7 @@ export default function Home() {
     { id: 'technical', title: 'Technical SEO', isOpen: false },
     { id: 'onpage', title: 'On-Page Optimization', isOpen: false },
     { id: 'content', title: 'Content Analysis', isOpen: false },
+    { id: 'search', title: 'Search Performance', isOpen: false },
     { id: 'backlinks', title: 'Backlink Profile', isOpen: false },
     { id: 'local', title: 'Local SEO', isOpen: false },
   ]);
@@ -81,7 +105,8 @@ export default function Home() {
         processedUrl = 'https://' + processedUrl;
       }
 
-      const response = await fetch('/api/analyze', {
+      // Get PageSpeed analysis
+      const pageSpeedResponse = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,19 +116,50 @@ export default function Home() {
         }),
       });
 
-      let errorData;
+      let pageSpeedData;
       try {
-        errorData = await response.json();
+        pageSpeedData = await pageSpeedResponse.json();
       } catch (e) {
-        console.error('Failed to parse error response:', e);
+        console.error('Failed to parse PageSpeed response:', e);
         throw new Error('Failed to analyze website. Please try again.');
       }
 
-      if (!response.ok) {
-        throw new Error(errorData.error || 'Failed to analyze website');
+      if (!pageSpeedResponse.ok) {
+        throw new Error(pageSpeedData.error || 'Failed to analyze website');
       }
 
-      setAnalysisResult(errorData);
+      // Get Search Console data
+      let searchConsoleData;
+      try {
+        const searchConsoleResponse = await fetch('/api/search-console', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: processedUrl,
+          }),
+        });
+        
+        if (searchConsoleResponse.ok) {
+          searchConsoleData = await searchConsoleResponse.json();
+        }
+      } catch (error) {
+        console.error('Search Console error:', error);
+        // Don't throw error, just continue without search data
+      }
+
+      // Combine results
+      const analysisResult = {
+        ...pageSpeedData,
+        searchConsole: searchConsoleData,
+        score: {
+          ...pageSpeedData.score,
+          searchVisibility: searchConsoleData ? Math.round((searchConsoleData.ctr * 10 + (100 - searchConsoleData.position)) / 2) : undefined,
+        },
+      };
+
+      setAnalysisResult(analysisResult);
       
       // Open the first section by default
       setSections(sections.map((section, index) => ({
@@ -229,15 +285,57 @@ export default function Home() {
                   <div className="text-3xl font-bold text-[#F26B3A]">{analysisResult.score.content}/10</div>
                 </div>
                 <div className="bg-[#F5F2EA] p-6 rounded-lg">
-                  <h4 className="font-semibold mb-2">Backlink Score</h4>
-                  <div className="text-3xl font-bold text-[#F26B3A]">{analysisResult.score.backlinks}/10</div>
+                  <h4 className="font-semibold mb-2">Search Visibility</h4>
+                  <div className="text-3xl font-bold text-[#F26B3A]">
+                    {analysisResult.score.searchVisibility ? `${analysisResult.score.searchVisibility}/10` : 'N/A'}
+                  </div>
                 </div>
               </div>
 
               {/* Analysis Sections */}
               <div className="space-y-4">
                 {sections.map((section) => {
-                  const sectionIssues = analysisResult.issues.filter(issue => issue.category === section.id);
+                  let sectionIssues = analysisResult.issues.filter(issue => issue.category === section.id);
+                  
+                  // Add Search Console data if available
+                  if (section.id === 'search' && analysisResult.searchConsole) {
+                    const { searchConsole } = analysisResult;
+                    const recommendations: string[] = [];
+                    
+                    if (searchConsole.position > 10) {
+                      recommendations.push('Improve your average position to increase visibility');
+                    }
+                    if (searchConsole.ctr < 0.02) {
+                      recommendations.push('Work on your titles and descriptions to improve click-through rate');
+                    }
+                    recommendations.push('Monitor your top performing queries and pages');
+                    recommendations.push('Create content around related keywords');
+
+                    sectionIssues = [{
+                      category: 'search',
+                      title: 'Search Performance Overview',
+                      simple_summary: "Here's how your website is performing in Google Search results over the last 30 days.",
+                      description: 'Analysis of your website\'s visibility and performance in Google Search results.',
+                      recommendations,
+                      current_value: `Clicks: ${searchConsole.clicks}, Impressions: ${searchConsole.impressions}, Avg Position: ${searchConsole.position.toFixed(1)}`,
+                      suggested_value: 'Aim for top 10 positions and CTR > 2%',
+                      implementation_details: [
+                        {
+                          title: 'Top Performing Queries',
+                          code: searchConsole.queries.map(q => 
+                            `${q.query}\n  Clicks: ${q.clicks}\n  Position: ${q.position.toFixed(1)}\n  CTR: ${(q.ctr * 100).toFixed(1)}%`
+                          ).join('\n\n')
+                        },
+                        {
+                          title: 'Top Performing Pages',
+                          code: searchConsole.pages.map(p => 
+                            `${p.page}\n  Clicks: ${p.clicks}\n  Position: ${p.position.toFixed(1)}\n  CTR: ${(p.ctr * 100).toFixed(1)}%`
+                          ).join('\n\n')
+                        }
+                      ]
+                    }];
+                  }
+
                   return (
                     <div key={section.id} className="border border-gray-200 rounded-lg overflow-hidden">
                       <button
