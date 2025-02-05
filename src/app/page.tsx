@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useCompletion } from 'ai/react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import Image from 'next/image';
 
 type AnalysisSection = {
   id: string;
@@ -154,10 +155,12 @@ export default function Home() {
                   className="flex items-center space-x-2 text-gray-600 hover:text-[#F26B3A]"
                 >
                   {user.picture && (
-                    <img
+                    <Image
                       src={user.picture}
                       alt="Profile"
-                      className="w-8 h-8 rounded-full"
+                      width={32}
+                      height={32}
+                      className="rounded-full"
                     />
                   )}
                   <span>Profile</span>
@@ -207,13 +210,13 @@ export default function Home() {
             <br />analyzer for your website
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Get actionable insights and improvements for your website's SEO performance
+            Get actionable insights and improvements for your website&apos;s SEO performance
           </p>
           <button 
             onClick={() => document.getElementById('analysis-form')?.scrollIntoView({ behavior: 'smooth' })}
             className="bg-[#F26B3A] text-white px-8 py-3 rounded-md hover:bg-[#E25A29] transition-colors"
           >
-            Let's work together
+            Let&apos;s work together
           </button>
         </div>
 
@@ -430,11 +433,11 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="bg-white rounded-lg p-6 shadow-sm">
             <h3 className="text-xl font-semibold mb-4">Technical SEO</h3>
-            <p className="text-gray-600">Comprehensive analysis of your site's technical health including speed, mobile-friendliness, and crawlability.</p>
+            <p className="text-gray-600">Comprehensive analysis of your site&apos;s technical health including speed, mobile-friendliness, and crawlability.</p>
           </div>
           <div className="bg-white rounded-lg p-6 shadow-sm">
             <h3 className="text-xl font-semibold mb-4">Content Optimization</h3>
-            <p className="text-gray-600">Get actionable insights to improve your content's relevance and keyword optimization.</p>
+            <p className="text-gray-600">Get actionable insights to improve your content&apos;s relevance and keyword optimization.</p>
           </div>
           <div className="bg-white rounded-lg p-6 shadow-sm">
             <h3 className="text-xl font-semibold mb-4">Backlink Analysis</h3>
