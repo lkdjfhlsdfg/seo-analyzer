@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import Image from 'next/image';
 
@@ -57,6 +57,12 @@ type SEOResult = {
 };
 
 export default function Home() {
+  const [isClient, setIsClient] = useState(false);
+  
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
   const [analysisResult, setAnalysisResult] = useState<SEOResult | null>(null);
@@ -183,6 +189,11 @@ export default function Home() {
       setIsAnalyzing(false);
     }
   };
+
+  // Wrap the return in a client-side check
+  if (!isClient) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <main className="min-h-screen bg-[#F5F2EA] text-[#2D2D2D]">

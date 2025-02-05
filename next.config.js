@@ -15,7 +15,7 @@ const nextConfig = {
           },
           {
             key: 'X-Frame-Options',
-            value: 'SAMEORIGIN'
+            value: 'DENY'
           },
           {
             key: 'X-Content-Type-Options',
@@ -23,12 +23,24 @@ const nextConfig = {
           },
           {
             key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin'
+            value: 'strict-origin-when-cross-origin'
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()'
           }
         ]
       }
     ];
-  }
-};
+  },
+  // Allow domains for images
+  images: {
+    domains: ['www.google.com', 'www.gstatic.com'],
+  },
+  // Strict mode for better development
+  reactStrictMode: true,
+  // Disable x-powered-by header
+  poweredByHeader: false,
+}
 
 module.exports = nextConfig; 
