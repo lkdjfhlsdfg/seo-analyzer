@@ -24,7 +24,11 @@ async function getPageSpeedData(url: string) {
     
     console.log('Calling PageSpeed API for URL:', url);
     
-    const response = await fetch(apiUrl);
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Referer': process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+      }
+    });
     const responseText = await response.text(); // Get raw response text first
     
     if (!response.ok) {
