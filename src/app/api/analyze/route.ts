@@ -131,12 +131,15 @@ async function getQuickPageSpeedData(url: string, signal?: AbortSignal) {
         'Referer': SITE_URL,
         'Origin': SITE_URL
       },
-      signal
+      signal,
+      // Add a longer timeout at the fetch level
+      next: { revalidate: 0 }
     });
 
     let data;
     try {
       const text = await response.text();
+      console.log('Raw API response:', text); // Debug log
       data = JSON.parse(text);
     } catch (e) {
       console.error('Failed to parse response:', e);
@@ -218,9 +221,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Quick analysis with a strict timeout
+    // Quick analysis with a longer timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second timeout for initial analysis
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout for initial analysis
 
     try {
       // Get quick performance score first
@@ -264,12 +267,27 @@ export async function POST(request: NextRequest) {
       if (error.name === 'AbortError') {
         return new NextResponse(
           JSON.stringify({ 
-            error: 'Quick analysis timeout. Please try again.',
+            error: 'Analysis is taking longer than expected. Please try again.',
+            analysisType: 'timeout',
             quick_score: {
               overall: 5,
               technical: 5,
               content: 5
-            }
+            },
+            issues: [{
+              category: 'technical',
+              title: 'Analysis Timeout',
+              simple_summary: 'The analysis is taking longer than expected.',
+              description: 'This could be due to the website being slow to respond or temporarily unavailable.',
+              severity: 5,
+              recommendations: [
+                'Try analyzing the website again',
+                'Check if the website is accessible in your browser',
+                'Try analyzing at a different time'
+              ],
+              current_value: 'Timeout after 8 seconds',
+              suggested_value: 'Analysis should complete within 8 seconds'
+            }]
           }),
           { status: 408, headers }
         );
@@ -286,11 +304,26 @@ export async function POST(request: NextRequest) {
       return new NextResponse(
         JSON.stringify({ 
           error: errorMessage,
+          analysisType: 'error',
           quick_score: {
             overall: 5,
             technical: 5,
             content: 5
-          }
+          },
+          issues: [{
+            category: 'technical',
+            title: 'Analysis Error',
+            simple_summary: errorMessage,
+            description: 'There was a problem analyzing this website.',
+            severity: 5,
+            recommendations: [
+              'Check if the URL is correct',
+              'Try analyzing the website again',
+              'If the problem persists, try a different website'
+            ],
+            current_value: 'Error during analysis',
+            suggested_value: 'Successful analysis'
+          }]
         }),
         { status: 500, headers }
       );
@@ -300,6 +333,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse(
       JSON.stringify({ 
         error: error.message || 'Failed to analyze website',
+        analysisType: 'error',
         quick_score: {
           overall: 5,
           technical: 5,
