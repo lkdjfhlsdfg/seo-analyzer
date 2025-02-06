@@ -126,17 +126,30 @@ async function getQuickPageSpeedData(url: string, signal?: AbortSignal) {
     
     const response = await fetch(apiUrl, {
       headers: {
-        'Referer': process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+        'Referer': 'https://seo-analyzer.vercel.app',
+        'Origin': 'https://seo-analyzer.vercel.app'
       },
       signal
     });
 
-    const data = await response.json();
+    let data;
+    try {
+      const text = await response.text();
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error('Failed to parse response:', e);
+      throw new Error('Invalid response from PageSpeed API');
+    }
 
     if (!response.ok) {
       const errorMessage = data.error?.message || `PageSpeed API error (${response.status})`;
       console.error('PageSpeed API error details:', data.error);
       throw new Error(errorMessage);
+    }
+
+    if (!data.lighthouseResult) {
+      console.error('Missing lighthouse result:', data);
+      throw new Error('Invalid response: Missing lighthouse result');
     }
 
     // Extract just the performance score for quick analysis
@@ -164,14 +177,13 @@ async function getQuickPageSpeedData(url: string, signal?: AbortSignal) {
   }
 }
 
-export const runtime = 'edge';
-
-function streamToJson(data: any) {
-  return JSON.stringify(data) + '\n';
-}
-
-export async function POST(request: Request) {
-  const encoder = new TextEncoder();
+export async function POST(request: NextRequest) {
+  console.log('Analyze API route called');
+  
+  const headers = new Headers({
+    'Cache-Control': `s-maxage=${CACHE_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+    'Content-Type': 'application/json',
+  });
 
   try {
     const body = await request.json();
@@ -183,165 +195,116 @@ export async function POST(request: Request) {
     }
 
     if (!isValidUrl(url)) {
-      return new Response(
-        streamToJson({ error: 'Invalid URL provided' }),
-        { status: 400 }
+      return new NextResponse(
+        JSON.stringify({ error: 'Invalid URL provided' }),
+        { status: 400, headers }
       );
     }
 
     if (!PAGESPEED_API_KEY) {
-      return new Response(
-        streamToJson({ 
+      console.error('PageSpeed API key is not configured');
+      return new NextResponse(
+        JSON.stringify({ 
           error: 'Service configuration error',
-          quick_score: { overall: 5, technical: 5, content: 5 }
+          quick_score: {
+            overall: 5,
+            technical: 5,
+            content: 5
+          }
         }),
-        { status: 500 }
+        { status: 500, headers }
       );
     }
 
-    // Create a streaming response
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          // Send initial message
-          controller.enqueue(encoder.encode(streamToJson({
-            status: 'started',
-            message: 'Starting analysis...'
-          })));
+    // Quick analysis with a strict timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second timeout for initial analysis
 
-          // Quick performance analysis
-          const performanceUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile&category=performance`;
-          const perfResponse = await fetch(performanceUrl);
-          const perfData = await perfResponse.json();
+    try {
+      // Get quick performance score first
+      const quickData = await getQuickPageSpeedData(url, controller.signal);
+      clearTimeout(timeoutId);
 
-          if (!perfResponse.ok) {
-            throw new Error(perfData.error?.message || 'Performance analysis failed');
-          }
+      const quickAnalysisResult = {
+        score: {
+          overall: quickData.performanceScore, // Initial score based just on performance
+          technical: quickData.performanceScore,
+          content: 5, // Placeholder until detailed analysis
+          backlinks: 5
+        },
+        issues: quickData.issues,
+        analysisType: 'quick',
+        note: 'Initial performance analysis complete. Refresh in 30 seconds for detailed results.',
+        nextCheck: Date.now() + 30000 // Tell client when to check for full results
+      };
 
-          const performanceScore = perfData.lighthouseResult?.categories?.performance?.score 
-            ? Math.round(perfData.lighthouseResult.categories.performance.score * 10) 
-            : 5;
+      // Store the URL for background processing
+      const cacheKey = `analysis-${url.replace(/[^a-zA-Z0-9]/g, '-')}`;
+      const cacheData = {
+        url,
+        timestamp: Date.now(),
+        status: 'pending',
+        result: quickAnalysisResult
+      };
 
-          // Send performance results
-          controller.enqueue(encoder.encode(streamToJson({
-            status: 'performance_complete',
-            score: {
-              overall: performanceScore,
-              technical: performanceScore,
+      // Store initial results in cache
+      await fetch(`https://api.vercel.com/v1/edge-config/${cacheKey}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${process.env.VERCEL_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(cacheData)
+      }).catch(console.error); // Don't fail if caching fails
+
+      return new NextResponse(JSON.stringify(quickAnalysisResult), { headers });
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        return new NextResponse(
+          JSON.stringify({ 
+            error: 'Quick analysis timeout. Please try again.',
+            quick_score: {
+              overall: 5,
+              technical: 5,
               content: 5
-            },
-            message: 'Performance analysis complete. Starting SEO analysis...'
-          })));
-
-          // SEO analysis
-          const seoUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile&category=seo`;
-          const seoResponse = await fetch(seoUrl);
-          const seoData = await seoResponse.json();
-
-          if (!seoResponse.ok) {
-            throw new Error(seoData.error?.message || 'SEO analysis failed');
-          }
-
-          const seoScore = seoData.lighthouseResult?.categories?.seo?.score 
-            ? Math.round(seoData.lighthouseResult.categories.seo.score * 10) 
-            : 5;
-
-          // Prepare final results
-          const finalResult = {
-            status: 'complete',
-            score: {
-              overall: Math.round((performanceScore + seoScore) / 2),
-              technical: performanceScore,
-              content: seoScore,
-              backlinks: 5
-            },
-            issues: [] as Array<{
-              category: string;
-              title: string;
-              simple_summary: string;
-              description: string;
-              severity: number;
-              recommendations: string[];
-              current_value: string;
-              suggested_value: string;
-            }>,
-            analysisType: 'detailed',
-            completedAt: Date.now()
-          };
-
-          // Add performance issues
-          if (performanceScore < 9) {
-            const lcp = perfData.lighthouseResult?.audits?.['largest-contentful-paint']?.numericValue;
-            const fcp = perfData.lighthouseResult?.audits?.['first-contentful-paint']?.numericValue;
-            
-            if (lcp || fcp) {
-              const recommendations: string[] = [];
-              if (lcp > 2500) recommendations.push('Optimize Largest Contentful Paint (LCP)');
-              if (fcp > 1800) recommendations.push('Improve First Contentful Paint (FCP)');
-
-              finalResult.issues.push({
-                category: 'technical',
-                title: 'Performance Issues Found',
-                simple_summary: 'Your website needs performance improvements.',
-                description: 'Performance metrics indicate areas for improvement.',
-                severity: 10 - performanceScore,
-                recommendations,
-                current_value: `LCP: ${lcp ? (lcp/1000).toFixed(1) : 'N/A'}s, FCP: ${fcp ? (fcp/1000).toFixed(1) : 'N/A'}s`,
-                suggested_value: 'LCP: < 2.5s, FCP: < 1.8s'
-              });
             }
-          }
-
-          // Add SEO issues
-          if (seoScore < 9) {
-            const seoAudits = seoData.lighthouseResult?.audits;
-            const seoIssues = [];
-            
-            if (!seoAudits?.['meta-description']?.score) seoIssues.push('Add meta descriptions');
-            if (!seoAudits?.['document-title']?.score) seoIssues.push('Add proper title tags');
-            if (!seoAudits?.['robots-txt']?.score) seoIssues.push('Check robots.txt');
-
-            if (seoIssues.length > 0) {
-              finalResult.issues.push({
-                category: 'content',
-                title: 'SEO Improvements Needed',
-                simple_summary: 'Your website needs SEO optimization.',
-                description: 'Several SEO elements need attention.',
-                severity: 10 - seoScore,
-                recommendations: seoIssues,
-                current_value: `SEO Score: ${seoScore}/10`,
-                suggested_value: 'SEO Score: > 9/10'
-              });
-            }
-          }
-
-          // Send final results
-          controller.enqueue(encoder.encode(streamToJson(finalResult)));
-          controller.close();
-        } catch (error: any) {
-          controller.enqueue(encoder.encode(streamToJson({
-            status: 'error',
-            error: error.message || 'Analysis failed',
-            quick_score: { overall: 5, technical: 5, content: 5 }
-          })));
-          controller.close();
-        }
+          }),
+          { status: 408, headers }
+        );
       }
-    });
-
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'application/x-ndjson',
-        'Cache-Control': `s-maxage=${CACHE_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+      
+      // Improved error handling
+      let errorMessage = 'Failed to analyze website. Please try again.';
+      if (error.message.includes('Invalid response')) {
+        errorMessage = 'Unable to analyze this website. Please check the URL and try again.';
+      } else if (error.message.includes('PageSpeed API error')) {
+        errorMessage = 'Analysis service temporarily unavailable. Please try again in a few minutes.';
       }
-    });
+
+      return new NextResponse(
+        JSON.stringify({ 
+          error: errorMessage,
+          quick_score: {
+            overall: 5,
+            technical: 5,
+            content: 5
+          }
+        }),
+        { status: 500, headers }
+      );
+    }
   } catch (error: any) {
-    return new Response(
-      streamToJson({ 
+    console.error('Analysis error:', error);
+    return new NextResponse(
+      JSON.stringify({ 
         error: error.message || 'Failed to analyze website',
-        quick_score: { overall: 5, technical: 5, content: 5 }
+        quick_score: {
+          overall: 5,
+          technical: 5,
+          content: 5
+        }
       }),
-      { status: 500 }
+      { status: 500, headers }
     );
   }
 }

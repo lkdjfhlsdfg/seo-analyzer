@@ -66,10 +66,24 @@ export async function POST(request: NextRequest) {
       try {
         // Request full analysis
         const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile&category=performance&category=seo`;
-        const response = await fetch(apiUrl);
-        const data = await response.json();
+        const response = await fetch(apiUrl, {
+          headers: {
+            'Referer': 'https://seo-analyzer.vercel.app',
+            'Origin': 'https://seo-analyzer.vercel.app'
+          }
+        });
+
+        let data;
+        try {
+          const text = await response.text();
+          data = JSON.parse(text);
+        } catch (e) {
+          console.error('Failed to parse response:', e);
+          throw new Error('Invalid response from PageSpeed API');
+        }
 
         if (!response.ok || !data.lighthouseResult) {
+          console.error('API Error or missing data:', data);
           throw new Error('Failed to get detailed analysis');
         }
 
