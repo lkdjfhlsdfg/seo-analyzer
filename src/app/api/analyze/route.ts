@@ -35,10 +35,22 @@ async function getPageSpeedData(url: string, signal?: AbortSignal) {
         'Referer': SITE_URL,
         'Origin': SITE_URL
       },
-      signal
+      signal,
+      next: { revalidate: 0 } // Disable caching for this request
     });
 
-    const data = await response.json();
+    // First try to get the response as text
+    const responseText = await response.text();
+    console.log('Raw API response:', responseText);
+
+    // Then parse it as JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse PageSpeed API response:', e);
+      throw new Error('Invalid response from PageSpeed API: Failed to parse JSON');
+    }
 
     // Check for API error response
     if (!response.ok) {
@@ -223,7 +235,10 @@ export async function POST(request: NextRequest) {
 
     // Quick analysis with a longer timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout for initial analysis
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      console.log('Analysis timeout triggered for URL:', url);
+    }, 8000); // 8-second timeout for initial analysis
 
     try {
       // Get quick performance score first
@@ -232,15 +247,15 @@ export async function POST(request: NextRequest) {
 
       const quickAnalysisResult = {
         score: {
-          overall: quickData.performanceScore, // Initial score based just on performance
+          overall: quickData.performanceScore,
           technical: quickData.performanceScore,
-          content: 5, // Placeholder until detailed analysis
+          content: 5,
           backlinks: 5
         },
         issues: quickData.issues,
         analysisType: 'quick',
         note: 'Initial performance analysis complete. Refresh in 30 seconds for detailed results.',
-        nextCheck: Date.now() + 30000 // Tell client when to check for full results
+        nextCheck: Date.now() + 30000
       };
 
       // Store the URL for background processing
@@ -252,19 +267,27 @@ export async function POST(request: NextRequest) {
         result: quickAnalysisResult
       };
 
-      // Store initial results in cache
-      await fetch(`https://api.vercel.com/v1/edge-config/${cacheKey}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${process.env.VERCEL_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(cacheData)
-      }).catch(console.error); // Don't fail if caching fails
+      try {
+        // Store initial results in cache
+        await fetch(`https://api.vercel.com/v1/edge-config/${cacheKey}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${process.env.VERCEL_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(cacheData)
+        });
+      } catch (cacheError) {
+        console.error('Failed to cache analysis results:', cacheError);
+        // Continue without caching
+      }
 
       return new NextResponse(JSON.stringify(quickAnalysisResult), { headers });
     } catch (error: any) {
+      clearTimeout(timeoutId);
+
       if (error.name === 'AbortError') {
+        console.log('Analysis aborted due to timeout for URL:', url);
         return new NextResponse(
           JSON.stringify({ 
             error: 'Analysis is taking longer than expected. Please try again.',
@@ -293,13 +316,19 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Improved error handling
+      // Improved error handling with more specific messages
       let errorMessage = 'Failed to analyze website. Please try again.';
+      let errorStatus = 500;
+
       if (error.message.includes('Invalid response')) {
         errorMessage = 'Unable to analyze this website. Please check the URL and try again.';
+        errorStatus = 400;
       } else if (error.message.includes('PageSpeed API error')) {
         errorMessage = 'Analysis service temporarily unavailable. Please try again in a few minutes.';
+        errorStatus = 503;
       }
+
+      console.error('Analysis error for URL:', url, error);
 
       return new NextResponse(
         JSON.stringify({ 
@@ -325,7 +354,7 @@ export async function POST(request: NextRequest) {
             suggested_value: 'Successful analysis'
           }]
         }),
-        { status: 500, headers }
+        { status: errorStatus, headers }
       );
     }
   } catch (error: any) {
