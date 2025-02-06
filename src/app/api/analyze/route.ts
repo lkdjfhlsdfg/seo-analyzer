@@ -1,7 +1,39 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import crypto from 'crypto';
 
 const PAGESPEED_API_KEY = process.env.GOOGLE_PAGESPEED_API_KEY;
+
+// Enhanced cache implementation with content hashing
+interface AnalysisCache {
+  result: any;
+  contentHash: string;
+  timestamp: number;
+}
+
+const analysisCache = new Map<string, AnalysisCache>();
+const CACHE_DURATION = 3600000; // 1 hour in milliseconds
+
+// Helper function to get content hash
+async function getContentHash(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'SEO-Analyzer/1.0',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch content: ${response.status}`);
+    }
+    
+    const content = await response.text();
+    return crypto.createHash('md5').update(content).digest('hex');
+  } catch (error) {
+    console.error('Error getting content hash:', error);
+    return Date.now().toString(); // Fallback to timestamp if can't get content
+  }
+}
 
 // Helper function to validate URL
 function isValidUrl(urlString: string) {
@@ -19,6 +51,73 @@ function sanitizeUrl(urlString: string) {
     return `https://${urlString}`;
   }
   return urlString;
+}
+
+// Helper function to get cached result with content validation
+async function getCachedResult(url: string): Promise<any | null> {
+  const cached = analysisCache.get(url);
+  if (!cached) return null;
+
+  // Check if cache is still valid time-wise
+  if (Date.now() - cached.timestamp > CACHE_DURATION) {
+    analysisCache.delete(url);
+    return null;
+  }
+
+  try {
+    // Get current content hash
+    const currentHash = await getContentHash(url);
+    
+    // If content hasn't changed, return cached result
+    if (currentHash === cached.contentHash) {
+      return cached.result;
+    }
+    
+    // Content changed, invalidate cache
+    analysisCache.delete(url);
+    return null;
+  } catch (error) {
+    console.error('Error validating cache:', error);
+    return null;
+  }
+}
+
+// Helper function to cache result with content hash
+async function cacheResult(url: string, result: any) {
+  try {
+    const contentHash = await getContentHash(url);
+    analysisCache.set(url, {
+      result,
+      contentHash,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('Error caching result:', error);
+  }
+}
+
+// Deterministic scoring weights
+const SCORE_WEIGHTS = {
+  performance: 0.3,
+  accessibility: 0.2,
+  seo: 0.3,
+  bestPractices: 0.2
+};
+
+// Helper function for deterministic scoring
+function calculateScore(categoryScores: Record<string, number>): number {
+  const normalizedScores = {
+    performance: categoryScores.performance || 0,
+    accessibility: categoryScores.accessibility || 0,
+    seo: categoryScores.seo || 0,
+    bestPractices: categoryScores['best-practices'] || 0
+  };
+
+  const weightedScore = Object.entries(SCORE_WEIGHTS).reduce((total, [category, weight]) => {
+    return total + (normalizedScores[category as keyof typeof normalizedScores] * weight);
+  }, 0);
+
+  return Math.round(weightedScore * 100);
 }
 
 // Add debug logging
@@ -110,13 +209,11 @@ export async function OPTIONS() {
 
 export async function POST(req: Request) {
   try {
-    // Parse request body
     const body = await req.json().catch(() => ({}));
     const { website } = body;
 
     console.log('Received request for website:', website);
 
-    // Validate input
     if (!website) {
       console.error('No website URL provided');
       return NextResponse.json(
@@ -125,13 +222,29 @@ export async function POST(req: Request) {
       );
     }
 
-    // Sanitize and validate URL
     const sanitizedUrl = sanitizeUrl(website);
     if (!isValidUrl(sanitizedUrl)) {
       console.error('Invalid website URL:', website);
       return NextResponse.json(
         { error: 'Please enter a valid website URL (e.g., example.com or https://example.com)' },
         { status: 400 }
+      );
+    }
+
+    // Check cache first with content validation
+    const cachedResult = await getCachedResult(sanitizedUrl);
+    if (cachedResult) {
+      console.log('Returning cached result for:', sanitizedUrl);
+      return NextResponse.json(
+        { result: cachedResult },
+        {
+          status: 200,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, s-maxage=3600',
+          },
+        }
       );
     }
 
@@ -420,17 +533,20 @@ export async function POST(req: Request) {
         processedAudits.technical.push(...uncategorizedAudits);
       }
 
-      // Calculate scores
+      // Calculate deterministic scores
       const scores = {
         performance: Math.round((categories.performance?.score || 0) * 100),
         technical: Math.round(((categories.accessibility?.score || 0) + (categories['best-practices']?.score || 0)) * 50),
         content: Math.round((categories.seo?.score || 0) * 100),
       };
 
-      // Calculate overall score
-      const overallScore = Math.round(
-        Object.values(scores).reduce((acc: number, score: number) => acc + score, 0) / Object.keys(scores).length
-      );
+      // Calculate overall score using weighted formula
+      const overallScore = calculateScore({
+        performance: categories.performance?.score || 0,
+        accessibility: categories.accessibility?.score || 0,
+        seo: categories.seo?.score || 0,
+        'best-practices': categories['best-practices']?.score || 0
+      });
 
       // Prepare the result object
       const result = {
@@ -453,6 +569,9 @@ export async function POST(req: Request) {
         }
       };
 
+      // Cache the result
+      await cacheResult(sanitizedUrl, result);
+
       return NextResponse.json(
         { result },
         {
@@ -460,7 +579,7 @@ export async function POST(req: Request) {
           headers: {
             'Access-Control-Allow-Origin': '*',
             'Content-Type': 'application/json',
-            'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+            'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=300',
           },
         }
       );
