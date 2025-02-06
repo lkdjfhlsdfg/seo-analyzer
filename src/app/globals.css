@@ -3,13 +3,75 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 45, 45, 45;
-  --background-rgb: 245, 242, 234;
+  /* Cohere-inspired color palette */
+  --volcanic-black: #0A0A0A;
+  --synthetic-quartz: #F5F5F5;
+  --coniferous-green: #2A4B3C;
+  --acrylic-blue: #88C0D0;
+  --cell-green: #34D399;
+  --cell-pattern: radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.1) 0%, transparent 50%);
+  
+  /* Animation variables */
+  --cell-expand: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
+  color: var(--volcanic-black);
+  background: linear-gradient(
+    135deg,
+    rgba(42, 75, 60, 0.05) 0%,
+    rgba(136, 192, 208, 0.05) 100%
+  );
+}
+
+/* Cohere-inspired animations */
+@keyframes cell-expand {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-cell-expand {
+  animation: cell-expand var(--cell-expand) forwards;
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: all var(--cell-expand);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -8px rgba(10, 10, 10, 0.15);
+  background: linear-gradient(
+    135deg,
+    rgba(42, 75, 60, 0.05) 0%,
+    rgba(136, 192, 208, 0.1) 100%
+  );
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--synthetic-quartz);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--coniferous-green);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--acrylic-blue);
 }
 
 @layer utilities {
