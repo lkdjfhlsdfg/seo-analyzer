@@ -2,13 +2,21 @@
 
 export default function LoadingSpinner() {
   return (
-    <div className="relative w-16 h-16 mx-auto">
-      <div className="absolute inset-0 border-4 border-[var(--synthetic-quartz)] rounded-full" />
-      <div className="absolute inset-0 border-4 border-t-[var(--cell-green)] rounded-full animate-spin" />
-      <div className="absolute inset-2 border-4 border-[var(--synthetic-quartz)] rounded-full" />
-      <div className="absolute inset-2 border-4 border-t-[var(--coniferous-green)] rounded-full animate-spin" style={{ animationDuration: '0.8s' }} />
-      <div className="absolute inset-4 border-4 border-[var(--synthetic-quartz)] rounded-full" />
-      <div className="absolute inset-4 border-4 border-t-[var(--acrylic-blue)] rounded-full animate-spin" style={{ animationDuration: '1.2s' }} />
+    <div className="relative w-24 h-24 mx-auto">
+      {/* Outer ring */}
+      <div className="absolute inset-0 rounded-full border-4 border-white/5" />
+      <div className="absolute inset-0 rounded-full border-4 border-t-primary animate-spin" style={{ animationDuration: '1s' }} />
+      
+      {/* Middle ring */}
+      <div className="absolute inset-4 rounded-full border-4 border-white/5" />
+      <div className="absolute inset-4 rounded-full border-4 border-t-secondary animate-spin" style={{ animationDuration: '1.5s' }} />
+      
+      {/* Inner ring */}
+      <div className="absolute inset-8 rounded-full border-4 border-white/5" />
+      <div className="absolute inset-8 rounded-full border-4 border-t-primary animate-spin" style={{ animationDuration: '2s' }} />
+      
+      {/* Center dot */}
+      <div className="absolute inset-[14px] rounded-full bg-gradient-to-br from-primary to-secondary animate-pulse-slow" />
     </div>
   );
 }
