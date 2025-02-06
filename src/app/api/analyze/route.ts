@@ -117,6 +117,53 @@ async function getPageSpeedData(url: string, signal?: AbortSignal) {
   }
 }
 
+async function getQuickPageSpeedData(url: string, signal?: AbortSignal) {
+  try {
+    // Request only performance metrics for quick analysis
+    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile&category=performance`;
+    
+    console.log('Quick PageSpeed analysis for URL:', url);
+    
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Referer': process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+      },
+      signal
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMessage = data.error?.message || `PageSpeed API error (${response.status})`;
+      console.error('PageSpeed API error details:', data.error);
+      throw new Error(errorMessage);
+    }
+
+    // Extract just the performance score for quick analysis
+    const performanceScore = data.lighthouseResult?.categories?.performance?.score 
+      ? Math.round(data.lighthouseResult.categories.performance.score * 10) 
+      : 5;
+
+    return {
+      performanceScore,
+      seoScore: 5, // Placeholder until detailed analysis
+      issues: [{
+        category: 'technical',
+        title: 'Initial Performance Score',
+        simple_summary: 'Initial performance analysis complete. Detailed analysis loading...',
+        description: 'Basic performance score calculated. Full analysis of SEO and other metrics in progress.',
+        severity: 10 - performanceScore,
+        recommendations: [],
+        current_value: `Performance Score: ${performanceScore}/10`,
+        suggested_value: 'Performance Score: > 9/10'
+      }]
+    };
+  } catch (error: any) {
+    console.error('Quick PageSpeed API Error:', error);
+    throw error;
+  }
+}
+
 export async function POST(request: NextRequest) {
   console.log('Analyze API route called');
   
@@ -156,31 +203,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Single attempt with a strict timeout
+    // Quick analysis with a strict timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second timeout for initial analysis
 
     try {
-      const pageSpeedData = await getPageSpeedData(url, controller.signal);
+      // Get quick performance score first
+      const quickData = await getQuickPageSpeedData(url, controller.signal);
       clearTimeout(timeoutId);
 
-      const analysisResult = {
+      const quickAnalysisResult = {
         score: {
-          overall: Math.round((pageSpeedData.performanceScore + pageSpeedData.seoScore) / 2),
-          technical: pageSpeedData.performanceScore,
-          content: pageSpeedData.seoScore,
+          overall: quickData.performanceScore, // Initial score based just on performance
+          technical: quickData.performanceScore,
+          content: 5, // Placeholder until detailed analysis
           backlinks: 5
         },
-        issues: pageSpeedData.issues,
-        note: 'This is a quick analysis. For detailed insights, try our full analysis feature.'
+        issues: quickData.issues,
+        analysisType: 'quick',
+        note: 'Initial performance analysis complete. Refresh in 30 seconds for detailed results.',
+        nextCheck: Date.now() + 30000 // Tell client when to check for full results
       };
 
-      return new NextResponse(JSON.stringify(analysisResult), { headers });
+      // Store the URL for background processing
+      const cacheKey = `analysis-${url.replace(/[^a-zA-Z0-9]/g, '-')}`;
+      const cacheData = {
+        url,
+        timestamp: Date.now(),
+        status: 'pending',
+        result: quickAnalysisResult
+      };
+
+      // Store initial results in cache
+      await fetch(`https://api.vercel.com/v1/edge-config/${cacheKey}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${process.env.VERCEL_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(cacheData)
+      }).catch(console.error); // Don't fail if caching fails
+
+      return new NextResponse(JSON.stringify(quickAnalysisResult), { headers });
     } catch (error: any) {
       if (error.name === 'AbortError') {
         return new NextResponse(
           JSON.stringify({ 
-            error: 'Analysis timeout. Try our full analysis feature for detailed results.',
+            error: 'Quick analysis timeout. Please try again.',
             quick_score: {
               overall: 5,
               technical: 5,
@@ -191,7 +260,6 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Handle specific API errors
       const errorMessage = error.message.includes('PageSpeed API error') 
         ? 'Failed to analyze website. Please check the URL and try again.'
         : error.message;
