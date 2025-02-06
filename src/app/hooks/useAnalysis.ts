@@ -1,136 +1,116 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
-interface AnalysisScore {
-  overall: number;
-  technical: number;
-  content: number;
-  backlinks: number;
+type ImpactLevel = 'high' | 'medium' | 'low';
+
+interface TopIssue {
+  title: string;
+  impact: ImpactLevel;
+  simple_summary: string;
+  recommendation: string;
+  category: 'technical' | 'content' | 'performance';
 }
 
-interface AnalysisIssue {
-  category: string;
+interface Audit {
   title: string;
-  simple_summary: string;
   description: string;
-  severity: number;
+  score: number;
+  displayValue?: string;
+  scoreDisplayMode: string;
   recommendations: string[];
+  impact: ImpactLevel;
+  warnings?: string[];
+  simple_summary: string;
   current_value: string;
   suggested_value: string;
+  implementation_details?: Array<{
+    title: string;
+    code: string;
+  }>;
+  category: 'technical' | 'content' | 'performance';
 }
 
 interface AnalysisResult {
-  score: AnalysisScore;
-  issues: AnalysisIssue[];
-  analysisType?: 'quick' | 'detailed' | 'timeout' | 'error';
-  note?: string;
-  nextCheck?: number;
-  error?: string;
+  websiteUrl: string;
+  timestamp: string;
+  scores: {
+    overall: number;
+    technical: number;
+    content: number;
+    performance: number;
+  };
+  audits: {
+    technical: Audit[];
+    content: Audit[];
+    performance: Audit[];
+  };
+  categoryDescriptions: {
+    technical: string;
+    content: string;
+    performance: string;
+  };
+  summary: {
+    technical: TopIssue[];
+    content: TopIssue[];
+    performance: TopIssue[];
+  };
 }
 
 export function useAnalysis() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
-
-  // Cleanup function for intervals
-  useEffect(() => {
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-    };
-  }, [pollingInterval]);
 
   const analyzeUrl = useCallback(async (url: string) => {
-    if (typeof window === 'undefined') {
-      console.warn('Window is not defined, skipping analysis');
-      return;
-    }
-
     setIsAnalyzing(true);
     setError(null);
-
-    // Clear any existing polling
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      setPollingInterval(null);
-    }
+    setResult(null);
 
     try {
-      // Initial quick analysis
+      // Validate URL format before making request
+      try {
+        new URL(url);
+      } catch (e) {
+        throw new Error('Please enter a valid URL (e.g., https://example.com)');
+      }
+
+      console.log('Analyzing URL:', url);
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt: url }),
+        body: JSON.stringify({ website: url }),
+      }).catch(err => {
+        throw new Error('Network error. Please check your connection and try again.');
+      });
+
+      const data = await response.json().catch(err => {
+        throw new Error('Invalid response from server. Please try again.');
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to analyze website');
+        console.error('API Response:', data);
+        throw new Error(data.error || 'Failed to analyze website. Please try again later.');
       }
 
-      const data = await response.json();
-      setResult(data);
-
-      // If it's a quick analysis, start polling for detailed results
-      if (data.analysisType === 'quick' && data.nextCheck) {
-        const interval = setInterval(async () => {
-          try {
-            const statusResponse = await fetch('/api/analyze/status', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ url }),
-            });
-
-            if (!statusResponse.ok) {
-              throw new Error('Failed to check analysis status');
-            }
-
-            const statusData = await statusResponse.json();
-
-            if (statusData.status === 'complete') {
-              clearInterval(interval);
-              setPollingInterval(null);
-              setResult(statusData.result);
-            } else if (statusData.status === 'error' || statusData.status === 'expired') {
-              clearInterval(interval);
-              setPollingInterval(null);
-              setResult(prev => prev ? {
-                ...prev,
-                note: 'Detailed analysis unavailable. Using quick analysis results.'
-              } : null);
-            }
-          } catch (error) {
-            console.error('Status check error:', error);
-            // Don't clear interval on network errors, just skip this check
-          }
-        }, 5000); // Check every 5 seconds
-
-        setPollingInterval(interval);
-
-        // Safety cleanup after 2 minutes
-        setTimeout(() => {
-          clearInterval(interval);
-          setPollingInterval(null);
-          setResult(prev => prev ? {
-            ...prev,
-            note: 'Detailed analysis timed out. Using quick analysis results.'
-          } : null);
-        }, 120000);
+      if (!data.result) {
+        throw new Error('Invalid response format. Please try again.');
       }
+
+      // Validate the result structure
+      if (!data.result.scores || !data.result.audits) {
+        throw new Error('Incomplete analysis results. Please try again.');
+      }
+
+      setResult(data.result);
     } catch (error: any) {
       console.error('Analysis error:', error);
-      setError(error.message || 'Failed to analyze website');
-      setResult(null);
+      setError(error.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
-  }, [pollingInterval]);
+  }, []);
 
   return {
     analyzeUrl,
@@ -138,4 +118,4 @@ export function useAnalysis() {
     error,
     result,
   };
-} 
+}

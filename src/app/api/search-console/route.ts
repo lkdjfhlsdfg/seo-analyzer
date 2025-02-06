@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
       if (error.name === 'AbortError') {
         return new NextResponse(
-          JSON.stringify({ 
+          JSON.stringify({
             error: 'Analysis timeout. Try our detailed analysis feature for full results.',
             quick_stats: {
               clicks: 0,
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Search Console analysis error:', error);
     return new NextResponse(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message || 'Failed to analyze search data',
         quick_stats: {
           clicks: 0,
@@ -157,4 +157,4 @@ export async function POST(request: NextRequest) {
       { status: 500, headers }
     );
   }
-} 
+}

@@ -1,375 +1,407 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { headers } from 'next/headers';
 
-// Environment variables
 const PAGESPEED_API_KEY = process.env.GOOGLE_PAGESPEED_API_KEY;
-const SITE_URL = 'https://seo-analyzer-77gs9bgrr-hans-projects-8b2f2b1c.vercel.app';
 
-// Cache duration constants
-const CACHE_MAX_AGE = 60; // 1 minute
-const STALE_WHILE_REVALIDATE = 30; // 30 seconds
+// Add debug logging
+console.log('PageSpeed API Key available:', !!PAGESPEED_API_KEY);
 
-function isValidUrl(urlString: string): boolean {
-  try {
-    new URL(urlString);
-    return true;
-  } catch {
-    return false;
-  }
-}
+type ImpactLevel = 'high' | 'medium' | 'low';
 
 interface AuditItem {
-  url: string;
-  [key: string]: any;
+  impact: ImpactLevel;
+  score: number;
+  title: string;
+  description: string;
+  displayValue?: string;
+  scoreDisplayMode: string;
+  details?: any;
+  warnings?: string[];
+  recommendations: string[];
+  simple_summary: string;
+  current_value: string;
+  suggested_value: string;
+  implementation_details?: Array<{
+    title: string;
+    code: string;
+  }>;
 }
 
-async function getPageSpeedData(url: string, signal?: AbortSignal) {
-  try {
-    // Simplified API request with correct fields parameter
-    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile&category=performance&category=seo`;
-    
-    console.log('Calling PageSpeed API for URL:', url);
-    
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Referer': SITE_URL,
-        'Origin': SITE_URL
-      },
-      signal,
-      next: { revalidate: 0 } // Disable caching for this request
-    });
+interface ProcessedAudit extends AuditItem {
+  impact: ImpactLevel;
+  category: 'technical' | 'content' | 'performance';
+}
 
-    // First try to get the response as text
-    const responseText = await response.text();
-    console.log('Raw API response:', responseText);
+interface TopIssue {
+  title: string;
+  impact: ImpactLevel;
+  simple_summary: string;
+  recommendation: string;
+  category: 'technical' | 'content' | 'performance';
+}
 
-    // Then parse it as JSON
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error('Failed to parse PageSpeed API response:', e);
-      throw new Error('Invalid response from PageSpeed API: Failed to parse JSON');
-    }
+// Helper function to get top issues
+const getTopIssues = (audits: ProcessedAudit[]): TopIssue[] => {
+  return audits
+    .filter(audit => audit.impact === 'high')
+    .slice(0, 3)
+    .map(audit => ({
+      title: audit.title,
+      impact: audit.impact,
+      simple_summary: audit.simple_summary,
+      recommendation: audit.recommendations[0] || '',
+      category: audit.category
+    }));
+};
 
-    // Check for API error response
-    if (!response.ok) {
-      const errorMessage = data.error?.message || `PageSpeed API error (${response.status})`;
-      console.error('PageSpeed API error details:', data.error);
-      throw new Error(errorMessage);
-    }
-
-    if (!data.lighthouseResult) {
-      console.error('Invalid API response:', data);
-      throw new Error('Invalid response from PageSpeed API: Missing lighthouse result');
-    }
-
-    const {
-      lighthouseResult: {
-        categories,
-        audits
-      }
-    } = data;
-
-    // Calculate basic scores with fallbacks
-    const performanceScore = categories?.performance?.score 
-      ? Math.round(categories.performance.score * 10) 
-      : 5;
-    const seoScore = categories?.seo?.score 
-      ? Math.round(categories.seo.score * 10) 
-      : 5;
-
-    const issues = [];
-    
-    // Quick performance check
-    if (performanceScore < 9) {
-      const lcp = audits?.['largest-contentful-paint']?.numericValue ?? 0;
-      const fcp = audits?.['first-contentful-paint']?.numericValue ?? 0;
-      
-      issues.push({
-        category: 'technical',
-        title: 'Performance Optimization Required',
-        simple_summary: 'Your website needs performance improvements.',
-        description: 'Core performance metrics indicate areas for improvement.',
-        severity: 10 - performanceScore,
-        recommendations: [
-          lcp > 2500 ? 'Optimize Largest Contentful Paint (LCP)' : null,
-          fcp > 1800 ? 'Improve First Contentful Paint (FCP)' : null,
-        ].filter(Boolean),
-        current_value: `LCP: ${(lcp/1000).toFixed(1)}s, FCP: ${(fcp/1000).toFixed(1)}s`,
-        suggested_value: 'LCP: < 2.5s, FCP: < 1.8s'
-      });
-    }
-
-    // Quick SEO check
-    const seoIssues = [];
-    if (!audits?.['meta-description']?.score) seoIssues.push('Add meta descriptions');
-    if (!audits?.['document-title']?.score) seoIssues.push('Add proper title tags');
-    if (!audits?.['robots-txt']?.score) seoIssues.push('Check robots.txt');
-
-    if (seoIssues.length > 0) {
-      issues.push({
-        category: 'content',
-        title: 'Basic SEO Improvements Needed',
-        simple_summary: 'Your website is missing some basic SEO elements.',
-        description: 'Essential SEO elements need to be implemented.',
-        severity: Math.min(8, seoIssues.length),
-        recommendations: seoIssues,
-        current_value: 'Missing basic SEO elements',
-        suggested_value: 'Implement all basic SEO elements'
-      });
-    }
-
-    return {
-      performanceScore,
-      seoScore,
-      issues
-    };
-  } catch (error: any) {
-    console.error('PageSpeed API Error:', error);
-    throw error;
+// Helper function to categorize audits
+const categorizeAudit = (audit: any, categoryId: string): 'technical' | 'content' | 'performance' => {
+  // Performance-related audits
+  if (categoryId === 'performance' ||
+      audit.id?.includes('speed') ||
+      audit.id?.includes('timing') ||
+      audit.id?.includes('load')) {
+    return 'performance';
   }
-}
-
-async function getQuickPageSpeedData(url: string, signal?: AbortSignal) {
-  try {
-    // Request only performance metrics for quick analysis
-    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile&category=performance`;
-    
-    console.log('Quick PageSpeed analysis for URL:', url);
-    
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Referer': SITE_URL,
-        'Origin': SITE_URL
-      },
-      signal,
-      // Add a longer timeout at the fetch level
-      next: { revalidate: 0 }
-    });
-
-    let data;
-    try {
-      const text = await response.text();
-      console.log('Raw API response:', text); // Debug log
-      data = JSON.parse(text);
-    } catch (e) {
-      console.error('Failed to parse response:', e);
-      throw new Error('Invalid response from PageSpeed API');
-    }
-
-    if (!response.ok) {
-      const errorMessage = data.error?.message || `PageSpeed API error (${response.status})`;
-      console.error('PageSpeed API error details:', data.error);
-      throw new Error(errorMessage);
-    }
-
-    if (!data.lighthouseResult) {
-      console.error('Missing lighthouse result:', data);
-      throw new Error('Invalid response: Missing lighthouse result');
-    }
-
-    // Extract just the performance score for quick analysis
-    const performanceScore = data.lighthouseResult?.categories?.performance?.score 
-      ? Math.round(data.lighthouseResult.categories.performance.score * 10) 
-      : 5;
-
-    return {
-      performanceScore,
-      seoScore: 5, // Placeholder until detailed analysis
-      issues: [{
-        category: 'technical',
-        title: 'Initial Performance Score',
-        simple_summary: 'Initial performance analysis complete. Detailed analysis loading...',
-        description: 'Basic performance score calculated. Full analysis of SEO and other metrics in progress.',
-        severity: 10 - performanceScore,
-        recommendations: [],
-        current_value: `Performance Score: ${performanceScore}/10`,
-        suggested_value: 'Performance Score: > 9/10'
-      }]
-    };
-  } catch (error: any) {
-    console.error('Quick PageSpeed API Error:', error);
-    throw error;
-  }
-}
-
-export async function POST(request: NextRequest) {
-  console.log('Analyze API route called');
   
-  const headers = new Headers({
-    'Cache-Control': `s-maxage=${CACHE_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
-    'Content-Type': 'application/json',
+  // Content-related audits
+  if (audit.id?.includes('content') ||
+      audit.id?.includes('seo') ||
+      audit.id?.includes('meta') ||
+      audit.id?.includes('description') ||
+      audit.id?.includes('title')) {
+    return 'content';
+  }
+  
+  // Technical SEO audits (default category for other checks)
+  return 'technical';
+};
+
+// Add OPTIONS handler for CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    },
   });
+}
 
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    const { prompt } = body;
-    let url = prompt.replace('Analyze this URL: ', '').trim();
-    
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://' + url;
-    }
+    const { website } = await req.json();
+    console.log('Analyzing website:', website);
 
-    if (!isValidUrl(url)) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Invalid URL provided' }),
-        { status: 400, headers }
-      );
+    if (!website) {
+      console.error('No website URL provided');
+      return NextResponse.json({ error: 'Website URL is required' }, { status: 400 });
     }
-
-    if (!PAGESPEED_API_KEY) {
-      console.error('PageSpeed API key is not configured');
-      return new NextResponse(
-        JSON.stringify({ 
-          error: 'Service configuration error',
-          quick_score: {
-            overall: 5,
-            technical: 5,
-            content: 5
-          }
-        }),
-        { status: 500, headers }
-      );
-    }
-
-    // Quick analysis with a longer timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-      console.log('Analysis timeout triggered for URL:', url);
-    }, 8000); // 8-second timeout for initial analysis
 
     try {
-      // Get quick performance score first
-      const quickData = await getQuickPageSpeedData(url, controller.signal);
-      clearTimeout(timeoutId);
-
-      const quickAnalysisResult = {
-        score: {
-          overall: quickData.performanceScore,
-          technical: quickData.performanceScore,
-          content: 5,
-          backlinks: 5
-        },
-        issues: quickData.issues,
-        analysisType: 'quick',
-        note: 'Initial performance analysis complete. Refresh in 30 seconds for detailed results.',
-        nextCheck: Date.now() + 30000
-      };
-
-      // Store the URL for background processing
-      const cacheKey = `analysis-${url.replace(/[^a-zA-Z0-9]/g, '-')}`;
-      const cacheData = {
-        url,
-        timestamp: Date.now(),
-        status: 'pending',
-        result: quickAnalysisResult
-      };
-
-      try {
-        // Store initial results in cache
-        await fetch(`https://api.vercel.com/v1/edge-config/${cacheKey}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${process.env.VERCEL_ACCESS_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(cacheData)
-        });
-      } catch (cacheError) {
-        console.error('Failed to cache analysis results:', cacheError);
-        // Continue without caching
-      }
-
-      return new NextResponse(JSON.stringify(quickAnalysisResult), { headers });
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-
-      if (error.name === 'AbortError') {
-        console.log('Analysis aborted due to timeout for URL:', url);
-        return new NextResponse(
-          JSON.stringify({ 
-            error: 'Analysis is taking longer than expected. Please try again.',
-            analysisType: 'timeout',
-            quick_score: {
-              overall: 5,
-              technical: 5,
-              content: 5
-            },
-            issues: [{
-              category: 'technical',
-              title: 'Analysis Timeout',
-              simple_summary: 'The analysis is taking longer than expected.',
-              description: 'This could be due to the website being slow to respond or temporarily unavailable.',
-              severity: 5,
-              recommendations: [
-                'Try analyzing the website again',
-                'Check if the website is accessible in your browser',
-                'Try analyzing at a different time'
-              ],
-              current_value: 'Timeout after 8 seconds',
-              suggested_value: 'Analysis should complete within 8 seconds'
-            }]
-          }),
-          { status: 408, headers }
-        );
-      }
-      
-      // Improved error handling with more specific messages
-      let errorMessage = 'Failed to analyze website. Please try again.';
-      let errorStatus = 500;
-
-      if (error.message.includes('Invalid response')) {
-        errorMessage = 'Unable to analyze this website. Please check the URL and try again.';
-        errorStatus = 400;
-      } else if (error.message.includes('PageSpeed API error')) {
-        errorMessage = 'Analysis service temporarily unavailable. Please try again in a few minutes.';
-        errorStatus = 503;
-      }
-
-      console.error('Analysis error for URL:', url, error);
-
-      return new NextResponse(
-        JSON.stringify({ 
-          error: errorMessage,
-          analysisType: 'error',
-          quick_score: {
-            overall: 5,
-            technical: 5,
-            content: 5
-          },
-          issues: [{
-            category: 'technical',
-            title: 'Analysis Error',
-            simple_summary: errorMessage,
-            description: 'There was a problem analyzing this website.',
-            severity: 5,
-            recommendations: [
-              'Check if the URL is correct',
-              'Try analyzing the website again',
-              'If the problem persists, try a different website'
-            ],
-            current_value: 'Error during analysis',
-            suggested_value: 'Successful analysis'
-          }]
-        }),
-        { status: errorStatus, headers }
-      );
+      new URL(website);
+    } catch (e) {
+      console.error('Invalid website URL:', website);
+      return NextResponse.json({ error: 'Invalid website URL' }, { status: 400 });
     }
-  } catch (error: any) {
-    console.error('Analysis error:', error);
-    return new NextResponse(
-      JSON.stringify({ 
-        error: error.message || 'Failed to analyze website',
-        analysisType: 'error',
-        quick_score: {
-          overall: 5,
-          technical: 5,
-          content: 5
+
+    const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY;
+    if (!apiKey) {
+      console.error('Google PageSpeed API key not found');
+      return NextResponse.json({ error: 'API configuration error' }, { status: 500 });
+    }
+
+    const encodedUrl = encodeURIComponent(website);
+    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodedUrl}&key=${apiKey}`;
+    
+    console.log('Fetching PageSpeed data...');
+    const response = await fetch(apiUrl);
+    
+    if (!response.ok) {
+      console.error('PageSpeed API error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('Error details:', errorText);
+      return NextResponse.json({ error: 'Failed to fetch PageSpeed data' }, { status: response.status });
+    }
+
+    const data = await response.json();
+    console.log('PageSpeed API response received');
+
+    if (!data.lighthouseResult) {
+      console.error('No lighthouse result in API response:', data);
+      return NextResponse.json({ error: 'Invalid API response' }, { status: 500 });
+    }
+
+    const { categories, audits } = data.lighthouseResult;
+    
+    if (!categories || !audits) {
+      console.error('Missing categories or audits in lighthouse result:', data.lighthouseResult);
+      return NextResponse.json({ error: 'Invalid lighthouse data' }, { status: 500 });
+    }
+
+    console.log('Processing lighthouse data...');
+
+    // Helper function to determine impact level
+    const getAuditImpact = (score: number): ImpactLevel => {
+      if (score >= 0.9) return 'low';
+      if (score >= 0.5) return 'medium';
+      return 'high';
+    };
+
+    // Helper function to get recommendations
+    const getRecommendations = (audit: any): string[] => {
+      if (!audit || audit.score === 1) return [];
+
+      const recommendations: string[] = [];
+
+      // Add the main description as a recommendation
+      if (audit.description) {
+        recommendations.push(audit.description);
+      }
+
+      // Add specific details from the audit
+      if (audit.details?.items?.length > 0) {
+        const items = audit.details.items.slice(0, 3);
+        items.forEach((item: any) => {
+          if (item.url) recommendations.push(`Optimize resource: ${item.url}`);
+          if (item.source) recommendations.push(`Check source: ${item.source}`);
+          if (item.snippet) recommendations.push(`Review code: ${item.snippet}`);
+        });
+      }
+
+      return recommendations;
+    };
+
+    // Helper function to get a simple summary
+    const getSimpleSummary = (audit: any): string => {
+      if (!audit) return '';
+      const score = Math.round((audit.score || 0) * 100);
+      return audit.description || `${audit.title} - Score: ${score}/100`;
+    };
+
+    // Helper function to get current value
+    const getCurrentValue = (audit: any): string => {
+      if (!audit) return '';
+      if (audit.displayValue) return audit.displayValue;
+      if (audit.details?.items?.[0]?.value) return String(audit.details.items[0].value);
+      if (audit.numericValue) return `${audit.numericValue.toFixed(2)}`;
+      return `Score: ${Math.round((audit.score || 0) * 100)}/100`;
+    };
+
+    // Helper function to get suggested value
+    const getSuggestedValue = (audit: any): string => {
+      if (!audit) return '';
+      if (audit.score === 1) return 'Already optimized';
+      if (audit.details?.items?.[0]?.target) return `Target: ${audit.details.items[0].target}`;
+      return 'Should be improved to reach a score of 90+';
+    };
+
+    // Helper function to get implementation details
+    const getImplementationDetails = (audit: any) => {
+      if (!audit?.details) return [];
+
+      const details = [];
+
+      if (audit.details.items?.length > 0) {
+        details.push({
+          title: 'Specific Items to Address',
+          code: JSON.stringify(audit.details.items.slice(0, 3), null, 2)
+        });
+      }
+
+      if (audit.details.debugData) {
+        details.push({
+          title: 'Technical Details',
+          code: JSON.stringify(audit.details.debugData, null, 2)
+        });
+      }
+
+      return details;
+    };
+
+    // Process audits with more detailed information
+    const processAudits = (audits: Record<string, any>, categoryId: string): ProcessedAudit[] => {
+      const impactOrder: Record<ImpactLevel, number> = { high: 3, medium: 2, low: 1 };
+
+      // Get the audit refs for this category
+      const categoryAuditRefs = categories[categoryId]?.auditRefs?.map((ref: any) => ref.id) || [];
+      console.log(`Audit refs for category ${categoryId}:`, categoryAuditRefs);
+
+      return Object.entries(audits)
+        .filter(([id, _]: [string, any]) => {
+          const isIncluded = categoryAuditRefs.includes(id);
+          console.log(`Checking audit ${id} for category ${categoryId}:`, isIncluded);
+          return isIncluded;
+        })
+        .map(([id, audit]: [string, any]): ProcessedAudit => {
+          const impact: ImpactLevel = getAuditImpact(audit.score || 0);
+          const category = categorizeAudit({ ...audit, id }, categoryId);
+
+          console.log(`Processing audit ${id}:`, {
+            title: audit.title,
+            score: audit.score,
+            impact,
+            category
+          });
+
+          return {
+            title: audit.title || '',
+            description: audit.description || '',
+            score: audit.score || 0,
+            displayValue: audit.displayValue,
+            scoreDisplayMode: audit.scoreDisplayMode || 'numeric',
+            details: audit.details,
+            warnings: audit.warnings || [],
+            recommendations: getRecommendations(audit),
+            impact,
+            simple_summary: getSimpleSummary(audit),
+            current_value: getCurrentValue(audit),
+            suggested_value: getSuggestedValue(audit),
+            implementation_details: getImplementationDetails(audit),
+            category
+          };
+        })
+        .sort((a, b) => {
+          const impactDiff = impactOrder[b.impact] - impactOrder[a.impact];
+          return impactDiff !== 0 ? impactDiff : (b.score - a.score);
+        });
+    };
+
+    // Process all audits
+    const allAudits = [
+      ...processAudits(audits, 'performance'),
+      ...processAudits(audits, 'seo'),
+      ...processAudits(audits, 'accessibility'),
+      ...processAudits(audits, 'best-practices')
+    ];
+
+    console.log('Processed audits count:', allAudits.length);
+    console.log('Sample audit:', allAudits[0]);
+    console.log('Available categories:', Object.keys(categories));
+    console.log('Category scores:', {
+      performance: categories.performance?.score,
+      seo: categories.seo?.score,
+      accessibility: categories.accessibility?.score,
+      bestPractices: categories['best-practices']?.score
+    });
+
+    // Map Lighthouse categories to our categories
+    const processedAudits = {
+      technical: allAudits.filter(audit => {
+        const auditCategory = audit.category as string;
+        const isTechnical = audit.title.toLowerCase().includes('accessibility') ||
+               audit.title.toLowerCase().includes('best-practices') ||
+               audit.description?.toLowerCase().includes('accessibility') ||
+               audit.description?.toLowerCase().includes('best practices') ||
+               auditCategory === 'accessibility' ||
+               auditCategory === 'best-practices';
+        if (isTechnical) {
+          console.log('Technical audit found:', { title: audit.title, category: auditCategory });
         }
+        return isTechnical;
       }),
-      { status: 500, headers }
+      content: allAudits.filter(audit => {
+        const auditCategory = audit.category as string;
+        const isContent = audit.title.toLowerCase().includes('seo') ||
+               audit.title.toLowerCase().includes('content') ||
+               audit.description?.toLowerCase().includes('seo') ||
+               audit.description?.toLowerCase().includes('content') ||
+               auditCategory === 'seo';
+        if (isContent) {
+          console.log('Content audit found:', { title: audit.title, category: auditCategory });
+        }
+        return isContent;
+      }),
+      performance: allAudits.filter(audit => {
+        const auditCategory = audit.category as string;
+        const isPerformance = audit.title.toLowerCase().includes('performance') ||
+               audit.title.toLowerCase().includes('speed') ||
+               audit.title.toLowerCase().includes('load') ||
+               audit.description?.toLowerCase().includes('performance') ||
+               audit.description?.toLowerCase().includes('speed') ||
+               audit.description?.toLowerCase().includes('load') ||
+               auditCategory === 'performance';
+        if (isPerformance) {
+          console.log('Performance audit found:', { title: audit.title, category: auditCategory });
+        }
+        return isPerformance;
+      })
+    };
+
+    console.log('Audit counts by category:', {
+      technical: processedAudits.technical.length,
+      content: processedAudits.content.length,
+      performance: processedAudits.performance.length
+    });
+
+    // If an audit wasn't categorized, put it in technical by default
+    const uncategorizedAudits = allAudits.filter(audit => 
+      !processedAudits.technical.includes(audit) &&
+      !processedAudits.content.includes(audit) &&
+      !processedAudits.performance.includes(audit)
+    );
+    
+    if (uncategorizedAudits.length > 0) {
+      console.log('Uncategorized audits:', uncategorizedAudits.map(a => a.title));
+      processedAudits.technical.push(...uncategorizedAudits);
+    }
+
+    // Calculate scores
+    const scores = {
+      performance: Math.round((categories.performance?.score || 0) * 100),
+      technical: Math.round(((categories.accessibility?.score || 0) + (categories['best-practices']?.score || 0)) * 50),
+      content: Math.round((categories.seo?.score || 0) * 100),
+    };
+
+    // Calculate overall score
+    const overallScore = Math.round(
+      Object.values(scores).reduce((acc: number, score: number) => acc + score, 0) / Object.keys(scores).length
+    );
+
+    // Prepare the result object
+    const result = {
+      websiteUrl: website,
+      timestamp: new Date().toISOString(),
+      scores: {
+        overall: overallScore,
+        ...scores
+      },
+      audits: processedAudits,
+      categoryDescriptions: {
+        technical: 'Analysis of your site\'s technical health including mobile-friendliness, accessibility, and crawlability.',
+        content: 'Evaluation of your content\'s SEO optimization and relevance.',
+        performance: 'Assessment of your website\'s speed and performance metrics.'
+      },
+      summary: {
+        technical: getTopIssues(processedAudits.technical),
+        content: getTopIssues(processedAudits.content),
+        performance: getTopIssues(processedAudits.performance)
+      }
+    };
+
+    return NextResponse.json(
+      { result },
+      {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  } catch (error) {
+    console.error('Error analyzing website:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to analyze website' },
+      {
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+      }
     );
   }
 }
