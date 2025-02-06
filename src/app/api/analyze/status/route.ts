@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 
 // Environment variables
 const PAGESPEED_API_KEY = process.env.GOOGLE_PAGESPEED_API_KEY;
+const SITE_URL = 'https://seo-analyzer-77gs9bgrr-hans-projects-8b2f2b1c.vercel.app';
 
 export async function POST(request: NextRequest) {
   const headers = new Headers({
@@ -68,8 +69,8 @@ export async function POST(request: NextRequest) {
         const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&strategy=mobile&category=performance&category=seo`;
         const response = await fetch(apiUrl, {
           headers: {
-            'Referer': 'https://seo-analyzer.vercel.app',
-            'Origin': 'https://seo-analyzer.vercel.app'
+            'Referer': SITE_URL,
+            'Origin': SITE_URL
           }
         });
 

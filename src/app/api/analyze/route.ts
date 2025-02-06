@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 
 // Environment variables
 const PAGESPEED_API_KEY = process.env.GOOGLE_PAGESPEED_API_KEY;
+const SITE_URL = 'https://seo-analyzer-77gs9bgrr-hans-projects-8b2f2b1c.vercel.app';
 
 // Cache duration constants
 const CACHE_MAX_AGE = 60; // 1 minute
@@ -31,7 +32,8 @@ async function getPageSpeedData(url: string, signal?: AbortSignal) {
     
     const response = await fetch(apiUrl, {
       headers: {
-        'Referer': process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+        'Referer': SITE_URL,
+        'Origin': SITE_URL
       },
       signal
     });
@@ -126,8 +128,8 @@ async function getQuickPageSpeedData(url: string, signal?: AbortSignal) {
     
     const response = await fetch(apiUrl, {
       headers: {
-        'Referer': 'https://seo-analyzer.vercel.app',
-        'Origin': 'https://seo-analyzer.vercel.app'
+        'Referer': SITE_URL,
+        'Origin': SITE_URL
       },
       signal
     });
