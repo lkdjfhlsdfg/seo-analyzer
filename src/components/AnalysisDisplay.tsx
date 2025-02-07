@@ -26,27 +26,27 @@ export default function AnalysisDisplay({ analysisData }: AnalysisDisplayProps) 
   const categories: Category[] = [
     {
       name: 'Technical SEO',
-      score: analysisData.technicalScore || 0,
-      description: 'Core technical aspects including mobile-friendliness and crawlability',
-      issues: analysisData.technicalIssues || []
+      score: analysisData.scores.technical || 0,
+      description: analysisData.categoryDescriptions.technical || 'Core technical aspects including mobile-friendliness and crawlability',
+      issues: analysisData.audits.technical || []
     },
     {
       name: 'Performance',
-      score: analysisData.performanceScore || 0,
-      description: 'Page speed and loading performance metrics',
-      issues: analysisData.performanceIssues || []
+      score: analysisData.scores.performance || 0,
+      description: analysisData.categoryDescriptions.performance || 'Page speed and loading performance metrics',
+      issues: analysisData.audits.performance || []
     },
     {
       name: 'Content',
-      score: analysisData.contentScore || 0,
-      description: 'Content quality and optimization analysis',
-      issues: analysisData.contentIssues || []
+      score: analysisData.scores.content || 0,
+      description: analysisData.categoryDescriptions.content || 'Content quality and optimization analysis',
+      issues: analysisData.audits.content || []
     },
     {
       name: 'Accessibility',
-      score: analysisData.accessibilityScore || 0,
+      score: Math.round(((analysisData.scores.accessibility || 0) + (analysisData.scores['best-practices'] || 0)) * 50) || 0,
       description: 'Web accessibility compliance and best practices',
-      issues: analysisData.accessibilityIssues || []
+      issues: [...(analysisData.audits.accessibility || []), ...(analysisData.audits['best-practices'] || [])]
     }
   ];
 
