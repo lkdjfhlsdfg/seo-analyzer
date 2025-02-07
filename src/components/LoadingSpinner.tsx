@@ -1,8 +1,12 @@
 'use client';
 
-export default function LoadingSpinner() {
+interface LoadingSpinnerProps {
+  className?: string;
+}
+
+export default function LoadingSpinner({ className = 'w-24 h-24' }: LoadingSpinnerProps) {
   return (
-    <div className="relative w-24 h-24 mx-auto">
+    <div className={`relative mx-auto ${className}`}>
       {/* Outer ring */}
       <div className="absolute inset-0 rounded-full border-4 border-white/5" />
       <div className="absolute inset-0 rounded-full border-4 border-t-primary animate-spin" style={{ animationDuration: '1s' }} />

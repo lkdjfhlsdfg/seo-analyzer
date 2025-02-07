@@ -31,6 +31,12 @@ interface Audit {
   }>;
 }
 
+interface AiSolution {
+  solution: string;
+  code?: string;
+  explanation?: string;
+}
+
 interface AnalysisResult {
   websiteUrl: string;
   timestamp: string;
@@ -97,11 +103,40 @@ export function AnalysisForm() {
     }
   };
 
+  const getAiSolution = async (issue: string): Promise<AiSolution> => {
+    try {
+      const response = await fetch('/api/openai/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          issue,
+          context: 'web development, SEO, accessibility, and performance optimization'
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to get AI solution');
+      return await response.json();
+    } catch (error) {
+      console.error('AI Solution Error:', error);
+      return { solution: 'Unable to generate solution at this time. Please try again later.' };
+    }
+  };
+
   const renderAuditSection = (
     title: 'Technical SEO' | 'Content Optimization' | 'Performance',
     audits: Audit[],
     description: string
   ) => {
+    const [expandedSolutions, setExpandedSolutions] = useState<Record<string, AiSolution>>({});
+    const [loadingSolutions, setLoadingSolutions] = useState<Record<string, boolean>>({});
+
+    const handleGetAiSolution = async (auditId: string, issue: string) => {
+      setLoadingSolutions(prev => ({ ...prev, [auditId]: true }));
+      const solution = await getAiSolution(issue);
+      setExpandedSolutions(prev => ({ ...prev, [auditId]: solution }));
+      setLoadingSolutions(prev => ({ ...prev, [auditId]: false }));
+    };
+
     const summaryKey = title === 'Technical SEO' ? 'technical' :
                       title === 'Content Optimization' ? 'content' :
                       'performance';
@@ -126,30 +161,83 @@ export function AnalysisForm() {
     });
 
     return (
-      <div className="mb-8">
-        <h3 className="text-xl font-semibold mb-2">{title}</h3>
-        <p className="text-gray-600 mb-4">{description}</p>
+      <div className="mb-12">
+        <div className="flex items-center gap-4 mb-6">
+          <h3 className="text-2xl font-display font-bold text-[var(--coniferous-green)]">{title}</h3>
+          <div className="flex-1 h-px bg-gradient-to-r from-[var(--coniferous-green)]/20 to-transparent"></div>
+        </div>
+        <p className="text-gray-600 mb-8">{description}</p>
 
-        {/* Quick Summary of High-Impact Issues */}
-        <div className="bg-amber-50 p-4 rounded-lg mb-6">
-          <h4 className="font-medium text-amber-900 mb-2">Priority Issues</h4>
+        {/* Priority Issues Section */}
+        <div className="bg-white/95 rounded-xl shadow-lg p-6 mb-8">
+          <h4 className="font-display text-xl font-semibold mb-4 text-[var(--coniferous-green)]">Priority Issues</h4>
           {result?.summary?.[summaryKey] && result.summary[summaryKey].length > 0 ? (
-            <ul className="space-y-2">
-              {result.summary[summaryKey].map((issue: TopIssue, idx: number) => (
-                <li key={idx} className="text-amber-800">
-                  <span className="font-medium">• {issue.title}</span>
-                  <br />
-                  <span className="text-sm">{issue.simple_summary}</span>
-                  {issue.recommendation && (
-                    <div className="mt-1 text-sm text-amber-700">
-                      Solution: {issue.recommendation}
+            <div className="space-y-6">
+              {result.summary[summaryKey].map((issue: TopIssue, idx: number) => {
+                const auditId = `${title}-${idx}`;
+                const solution = expandedSolutions[auditId];
+                const isLoading = loadingSolutions[auditId];
+
+                return (
+                  <div key={idx} className="relative">
+                    <div className="flex items-start gap-4">
+                      <div className={`w-2 h-2 rounded-full mt-2 ${
+                        issue.impact === 'high' ? 'bg-red-500' :
+                        issue.impact === 'medium' ? 'bg-yellow-500' :
+                        'bg-green-500'
+                      }`} />
+                      <div className="flex-1">
+                        <h5 className="text-lg font-semibold text-gray-900 mb-2">{issue.title}</h5>
+                        <p className="text-gray-700 mb-3">{issue.simple_summary}</p>
+                        
+                        {!solution && !isLoading && (
+                          <button
+                            onClick={() => handleGetAiSolution(auditId, `${issue.title}: ${issue.simple_summary}`)}
+                            className="inline-flex items-center gap-2 text-[var(--cohere-blue)] hover:text-[var(--cohere-dark)] transition-colors"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Get AI Solution
+                          </button>
+                        )}
+
+                        {isLoading && (
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <LoadingSpinner className="w-5 h-5" />
+                            Generating solution...
+                          </div>
+                        )}
+
+                        {solution && (
+                          <div className="mt-4 bg-gray-50 rounded-lg p-4">
+                            <div className="prose prose-sm max-w-none">
+                              <h6 className="text-sm font-semibold text-gray-900 mb-2">AI-Suggested Solution:</h6>
+                              <p className="text-gray-700">{solution.solution}</p>
+                              {solution.code && (
+                                <pre className="mt-3 p-3 bg-gray-800 text-gray-200 rounded-md overflow-x-auto">
+                                  <code>{solution.code}</code>
+                                </pre>
+                              )}
+                              {solution.explanation && (
+                                <p className="mt-2 text-sm text-gray-600">{solution.explanation}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </li>
-              ))}
-            </ul>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
-            <p className="text-green-700">✓ No high-priority issues found.</p>
+            <div className="text-center py-6">
+              <svg className="w-12 h-12 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-gray-700">No priority issues found in this category.</p>
+            </div>
           )}
         </div>
 
@@ -364,10 +452,13 @@ export function AnalysisForm() {
                 { title: 'Content', score: result.scores.content },
                 { title: 'Performance', score: result.scores.performance }
               ].map((item) => (
-                <div key={item.title} className="card-hover bg-white/50 p-6 rounded-xl border border-[var(--synthetic-quartz)]">
-                  <h4 className="font-semibold text-lg mb-3 text-[var(--coniferous-green)]">{item.title}</h4>
-                  <div className={`text-4xl font-bold ${getScoreColor(item.score)}`}>
-                    {item.score}/100
+                <div key={item.title} className="relative overflow-hidden bg-white/90 rounded-xl border border-[var(--synthetic-quartz)] shadow-lg">
+                  <div className="absolute inset-0 bg-gradient-to-br from-transparent to-starlight-light/5"></div>
+                  <div className="relative p-6">
+                    <h4 className="font-display text-lg font-semibold mb-2 text-[var(--coniferous-green)]">{item.title}</h4>
+                    <div className={`font-display text-4xl font-bold tabular-nums ${getScoreColor(item.score)}`}>
+                      {item.score}/100
+                    </div>
                   </div>
                 </div>
               ))}

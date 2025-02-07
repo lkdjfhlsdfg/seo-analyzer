@@ -30,6 +30,8 @@ module.exports = {
         warning: '#FBBF24',
         error: '#EF4444',
         info: '#88C0D0',
+        primary: 'var(--starlight-light)',
+        secondary: 'var(--cohere-blue)',
       },
       fontFamily: {
         sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
@@ -51,17 +53,61 @@ module.exports = {
         'gradient': 'gradient 8s ease infinite',
         'slide-up': 'slideUp 0.5s ease-out',
         'fade-in': 'fadeIn 0.5s ease-out',
+        'cell-expand': 'cellExpand 0.5s ease-out',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-primary': 'linear-gradient(135deg, var(--starlight-green) 0%, var(--cohere-blue) 100%)',
         'gradient-surface': 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
+        'cell-pattern': 'url("/grid.svg")',
       },
       boxShadow: {
         'glow': '0 0 20px rgba(52, 211, 153, 0.2)',
         'glow-blue': '0 0 20px rgba(136, 192, 208, 0.2)',
       },
+      typography: (theme) => ({
+        DEFAULT: {
+          css: {
+            color: theme('colors.gray.700'),
+            maxWidth: 'none',
+            hr: {
+              borderColor: theme('colors.gray.200'),
+              marginTop: '2em',
+              marginBottom: '2em',
+            },
+            'h1, h2, h3, h4': {
+              color: theme('colors.gray.900'),
+              fontWeight: '600',
+            },
+            pre: {
+              backgroundColor: theme('colors.gray.800'),
+              color: theme('colors.gray.200'),
+              fontSize: '0.875rem',
+              lineHeight: '1.7142857',
+              marginTop: '1.7142857em',
+              marginBottom: '1.7142857em',
+              borderRadius: '0.375rem',
+              paddingTop: '0.8571429em',
+              paddingRight: '1.1428571em',
+              paddingBottom: '0.8571429em',
+              paddingLeft: '1.1428571em',
+            },
+            code: {
+              color: theme('colors.gray.200'),
+              backgroundColor: theme('colors.gray.800'),
+              paddingLeft: '0.25rem',
+              paddingRight: '0.25rem',
+              paddingTop: '0.125rem',
+              paddingBottom: '0.125rem',
+              borderRadius: '0.25rem',
+              fontWeight: '400',
+            },
+          },
+        },
+      }),
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 }
