@@ -66,6 +66,8 @@ interface AnalysisResult {
 export function AnalysisForm() {
   const [url, setUrl] = useState('');
   const [expandedAudits, setExpandedAudits] = useState<Record<string, boolean>>({});
+  const [expandedSolutions, setExpandedSolutions] = useState<Record<string, AiSolution>>({});
+  const [loadingSolutions, setLoadingSolutions] = useState<Record<string, boolean>>({});
   const { analyzeUrl, isAnalyzing, error, result } = useAnalysis();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,21 +124,18 @@ export function AnalysisForm() {
     }
   };
 
+  const handleGetAiSolution = async (auditId: string, issue: string) => {
+    setLoadingSolutions(prev => ({ ...prev, [auditId]: true }));
+    const solution = await getAiSolution(issue);
+    setExpandedSolutions(prev => ({ ...prev, [auditId]: solution }));
+    setLoadingSolutions(prev => ({ ...prev, [auditId]: false }));
+  };
+
   const renderAuditSection = (
     title: 'Technical SEO' | 'Content Optimization' | 'Performance',
     audits: Audit[],
     description: string
   ) => {
-    const [expandedSolutions, setExpandedSolutions] = useState<Record<string, AiSolution>>({});
-    const [loadingSolutions, setLoadingSolutions] = useState<Record<string, boolean>>({});
-
-    const handleGetAiSolution = async (auditId: string, issue: string) => {
-      setLoadingSolutions(prev => ({ ...prev, [auditId]: true }));
-      const solution = await getAiSolution(issue);
-      setExpandedSolutions(prev => ({ ...prev, [auditId]: solution }));
-      setLoadingSolutions(prev => ({ ...prev, [auditId]: false }));
-    };
-
     const summaryKey = title === 'Technical SEO' ? 'technical' :
                       title === 'Content Optimization' ? 'content' :
                       'performance';
