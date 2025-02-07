@@ -30,7 +30,7 @@ export function middleware(request: NextRequest) {
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data: https://* http://*;
     font-src 'self' https://fonts.gstatic.com;
-    connect-src 'self' https://* http://* www.googleapis.com;
+    connect-src 'self' https://* http://* *.googleapis.com;
     frame-src 'self' https://* http://*;
     object-src 'none';
     base-uri 'self';
@@ -38,10 +38,12 @@ export function middleware(request: NextRequest) {
     upgrade-insecure-requests;
   `.replace(/\s{2,}/g, ' ').trim());
   
+  // Additional security headers
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'SAMEORIGIN');
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
   return response;
 }

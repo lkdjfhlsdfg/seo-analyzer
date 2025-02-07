@@ -12,6 +12,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "autoprefixer": "^10.4.17",
     "cors": "^2.8.5",
     "json-schema-traverse": "^1.0.0",
