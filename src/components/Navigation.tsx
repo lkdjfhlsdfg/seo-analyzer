@@ -87,21 +87,21 @@ export default function Navigation() {
           <div className="flex items-center">
             <Link 
               href="/app" 
-              className="flex items-center space-x-2 text-black hover:text-black/70 transition-colors"
+              className="text-lg font-light text-black hover:text-black/70 transition-colors"
             >
-              <span className="text-lg font-light">SEO Analyzer</span>
+              SEO Analyzer
             </Link>
           </div>
 
           <div className="flex items-center space-x-6">
             {error && (
-              <div className="text-red-600 text-sm">
+              <div className="text-sm text-red-700">
                 {error}
               </div>
             )}
 
             {/* Current Mode Badge */}
-            <div className="text-sm text-black/70">
+            <div className="text-sm font-light text-black/70">
               {isPro ? 'Pro' : 'Free'} Plan
             </div>
 
@@ -109,7 +109,7 @@ export default function Navigation() {
             {user && (
               <button
                 onClick={handleDevModeToggle}
-                className="text-sm text-black/70 hover:text-black transition-colors"
+                className="text-sm font-light text-black/70 hover:text-black transition-colors"
               >
                 Switch to {isPro ? 'Free' : 'Pro'}
               </button>
@@ -119,14 +119,14 @@ export default function Navigation() {
             <div className="hidden md:flex items-center space-x-6">
               <Link
                 href="/app"
-                className="text-sm text-black/70 hover:text-black transition-colors"
+                className="text-sm font-light text-black/70 hover:text-black transition-colors"
               >
                 Dashboard
               </Link>
               {isPro && (
                 <Link
                   href="/reports"
-                  className="text-sm text-black/70 hover:text-black transition-colors"
+                  className="text-sm font-light text-black/70 hover:text-black transition-colors"
                 >
                   Reports
                 </Link>
@@ -138,14 +138,14 @@ export default function Navigation() {
               {user ? (
                 <button
                   onClick={handleLogout}
-                  className="text-sm text-black/70 hover:text-black transition-colors"
+                  className="text-sm font-light text-black/70 hover:text-black transition-colors"
                 >
                   Logout
                 </button>
               ) : (
                 <Link
                   href="/"
-                  className="text-sm text-black border border-black/10 px-4 py-2 rounded-lg hover:border-black/20 transition-all"
+                  className="h-10 px-4 rounded-lg border border-black/10 bg-white text-black hover:bg-black/5 transition-all text-sm font-light"
                 >
                   Login
                 </Link>

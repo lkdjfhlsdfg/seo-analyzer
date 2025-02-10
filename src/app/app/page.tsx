@@ -18,14 +18,14 @@ export default function AppPage() {
   }, [user, router]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-blue-50">
+    <div className="min-h-screen bg-white">
       {/* Background pattern */}
-      <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
+      <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center opacity-[0.02]" />
       
       <div className="relative">
         <Navigation />
         <main className="container mx-auto px-4 py-8">
-          <div className="backdrop-blur-xl bg-white/70 rounded-3xl shadow-xl border border-white/20">
+          <div className="rounded-lg border border-black/10 bg-white p-8">
             <AnalysisForm />
           </div>
         </main>

@@ -48,37 +48,35 @@ export default function WelcomePage() {
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
                   onClick={handleGoogleLogin}
-                  className="px-6 py-4 border border-black/10 rounded-lg text-black hover:border-black/20 transition-all text-sm"
+                  className="h-16 px-8 rounded-lg border border-black/10 bg-white text-black hover:bg-black/5 transition-all text-lg font-light"
                 >
                   Continue with Google
                 </button>
 
                 <button
                   onClick={handleGuestAccess}
-                  className="px-6 py-4 text-black/70 hover:text-black transition-colors text-sm"
+                  className="h-16 px-8 rounded-lg border border-black/10 bg-white text-black hover:bg-black/5 transition-all text-lg font-light"
                 >
                   Try as Guest
                 </button>
               </div>
 
               <div className="grid grid-cols-3 gap-8 pt-8">
-                <div className="space-y-2">
-                  <div className="text-3xl font-light text-black">98%</div>
-                  <div className="text-sm text-black/70">Accuracy Rate</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-3xl font-light text-black">5K+</div>
-                  <div className="text-sm text-black/70">Websites Analyzed</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-3xl font-light text-black">24/7</div>
-                  <div className="text-sm text-black/70">Real-time Monitoring</div>
-                </div>
+                {[
+                  { value: '98%', label: 'Accuracy Rate' },
+                  { value: '5K+', label: 'Websites Analyzed' },
+                  { value: '24/7', label: 'Real-time Monitoring' }
+                ].map((stat, index) => (
+                  <div key={index} className="p-6 rounded-lg border border-black/10 hover:bg-black/5 transition-all">
+                    <div className="text-3xl font-light text-black">{stat.value}</div>
+                    <div className="text-sm text-black/70">{stat.label}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Right column - Features */}
-            <div className="border border-black/10 rounded-lg p-8">
+            <div className="border border-black/10 rounded-lg p-8 hover:bg-black/5 transition-all">
               <div className="space-y-6">
                 <h2 className="text-2xl font-light text-black">Why choose our SEO Analyzer?</h2>
                 
@@ -105,11 +103,13 @@ export default function WelcomePage() {
                       icon: '🚀'
                     }
                   ].map((feature, index) => (
-                    <div key={index} className="flex items-start space-x-4 p-4 border border-black/10 rounded-lg hover:border-black/20 transition-colors">
-                      <div className="text-2xl">{feature.icon}</div>
-                      <div>
-                        <h3 className="font-medium text-black">{feature.title}</h3>
-                        <p className="text-sm text-black/70">{feature.description}</p>
+                    <div key={index} className="p-6 rounded-lg border border-black/10 hover:bg-black/5 transition-all">
+                      <div className="flex items-start space-x-4">
+                        <div className="text-2xl">{feature.icon}</div>
+                        <div>
+                          <h3 className="font-medium text-black">{feature.title}</h3>
+                          <p className="text-sm text-black/70">{feature.description}</p>
+                        </div>
                       </div>
                     </div>
                   ))}
