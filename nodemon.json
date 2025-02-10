@@ -1,0 +1,7 @@
+{
+  "watch": ["src/**/*", "public/**/*"],
+  "ext": "ts,tsx,js,jsx,json,css,svg",
+  "exec": "next dev",
+  "legacyWatch": true,
+  "delay": "1000"
+} 

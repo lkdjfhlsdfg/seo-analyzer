@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useAnalysis } from '@/app/hooks/useAnalysis';
 import LoadingSpinner from './LoadingSpinner';
 import AnalysisDisplay from './AnalysisDisplay';
+import { ArrowRightIcon } from '@heroicons/react/24/outline';
 
 type ImpactLevel = 'high' | 'medium' | 'low';
 
@@ -79,88 +80,119 @@ export function AnalysisForm() {
     setUrl(e.target.value);
   };
 
+  const steps = [
+    { title: 'Technical Analysis', description: 'Analyzing technical SEO aspects' },
+    { title: 'Performance Check', description: 'Checking website performance' },
+    { title: 'Content Audit', description: 'Evaluating content quality' },
+    { title: 'Final Report', description: 'Generating recommendations' },
+  ];
+
+  if (result && !isAnalyzing) {
+    return (
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg p-8">
+          <div className="mb-6">
+            <input
+              type="url"
+              value={url}
+              onChange={handleUrlChange}
+              placeholder="https://example.com"
+              className="w-full rounded-xl border-2 border-slate-200 bg-white/50 px-4 py-3 text-lg"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Object.entries(result.scores).map(([category, score]) => (
+              <div key={category} className="bg-white rounded-xl shadow-md p-6 relative group">
+                <div className="text-sm font-medium text-slate-600 capitalize mb-2">
+                  {category === 'overall' ? 'Overall Score' : category}
+                </div>
+                <div className="text-3xl font-bold text-slate-900">
+                  {score}
+                </div>
+                <button 
+                  onClick={() => {
+                    localStorage.setItem('analysisData', JSON.stringify(result.audits));
+                    window.location.href = `/${category.toLowerCase()}`;
+                  }}
+                  className="absolute bottom-4 right-4 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <span className="text-sm mr-1">View Issues</span>
+                  <ArrowRightIcon className="w-4 h-4 inline" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-4 bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+            <p className="text-red-700">{error}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg p-8 mb-8 animate-cell-expand">
+      <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="url" className="block text-xl font-medium text-[var(--coniferous-green)] mb-2">
+            <label htmlFor="url" className="block text-xl font-medium text-slate-900 mb-2">
               Enter Website URL
             </label>
-            <div className="relative mt-1 group">
+            <div className="flex gap-4">
               <input
                 type="url"
                 id="url"
                 value={url}
                 onChange={handleUrlChange}
                 placeholder="https://example.com"
-                className="block w-full rounded-xl border-2 border-[var(--coniferous-green)] bg-white/50 shadow-sm focus:ring-[var(--cell-green)] focus:border-[var(--cell-green)] text-gray-900 text-lg px-4 py-4 transition-all duration-300"
+                className="flex-1 rounded-xl border-2 border-slate-200 bg-white/50 px-4 py-3 text-lg"
                 required
               />
-              <div className="absolute inset-0 rounded-xl bg-[var(--cell-pattern)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+              <button
+                type="submit"
+                disabled={isAnalyzing}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+              </button>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isAnalyzing}
-            className="w-full bg-[var(--coniferous-green)] text-white py-4 px-6 rounded-xl text-lg font-medium hover:bg-[var(--cell-green)] focus:outline-none focus:ring-2 focus:ring-[var(--cell-green)] focus:ring-offset-2 disabled:opacity-50 transition-all duration-300 relative overflow-hidden group"
-          >
-            <span className="relative z-10">
-              {isAnalyzing ? 'Analyzing...' : 'Analyze Now'}
-            </span>
-            <div className="absolute inset-0 bg-[var(--cell-pattern)] opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8">
+            {steps.map((step, index) => (
+              <div 
+                key={index}
+                className={`p-4 rounded-lg border-2 ${
+                  isAnalyzing ? 'border-blue-200 bg-blue-50/50' : 'border-slate-200 bg-white/50'
+                }`}
+              >
+                <div className="text-lg font-semibold text-slate-900 mb-1">
+                  Step {index + 1}
+                </div>
+                <p className="text-sm text-slate-600">
+                  {step.description}
+                </p>
+              </div>
+            ))}
+          </div>
         </form>
       </div>
 
-      {error && (
-        <div className="bg-red-50/80 backdrop-blur-sm border-l-4 border-red-400 p-6 mb-8 rounded-xl animate-cell-expand">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-6 w-6 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-base text-red-600">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isAnalyzing && (
-        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg p-8 mb-8 animate-cell-expand">
-          <div className="text-center">
-            <LoadingSpinner />
-            <p className="mt-4 text-lg text-[var(--coniferous-green)]">Analyzing your website. This may take a minute...</p>
-            <div className="mt-4 text-base text-[var(--volcanic-black)]">
-              We&apos;re checking:
-              <ul className="mt-3 space-y-2">
-                <li className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[var(--cell-green)]" />
-                  Performance metrics
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[var(--acrylic-blue)]" />
-                  SEO optimization
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[var(--coniferous-green)]" />
-                  Accessibility
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[var(--cell-green)]" />
-                  Best practices
-                </li>
-              </ul>
-            </div>
-          </div>
+        <div className="mt-8 text-center">
+          <LoadingSpinner />
+          <p className="mt-4 text-slate-600">Analyzing your website...</p>
         </div>
       )}
 
-      {result && !isAnalyzing && (
-        <AnalysisDisplay analysisData={result} />
+      {error && (
+        <div className="mt-4 bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+          <p className="text-red-700">{error}</p>
+        </div>
       )}
     </div>
   );
