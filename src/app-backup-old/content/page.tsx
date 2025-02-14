@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Navigation from '@/components/Navigation';
 import CategoryNav from '@/components/CategoryNav';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
-import { useRouter } from 'next/navigation';
 
 type ImpactLevel = 'high' | 'medium' | 'low';
 
@@ -15,7 +14,6 @@ interface Problem {
   simple_summary: string;
   recommendations: string[];
   tags?: string[];
-  category?: string;
 }
 
 interface AnalysisData {
@@ -27,7 +25,6 @@ interface AnalysisData {
 export default function ContentPage() {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const storedData = localStorage.getItem('analysisData');
@@ -54,9 +51,7 @@ export default function ContentPage() {
               .map(word => word.charAt(0).toUpperCase() + word.slice(1))
               .join(' '),
             tags: [
-              // Add 'highest-impact' tag for high impact issues with low scores
               problem.impact === 'high' && (problem.score || 0) < 0.5 ? 'highest-impact' : null,
-              // Add 'easy-solve' tag for issues with high scores (closer to passing)
               (problem.score || 0) > 0.7 ? 'easy-solve' : null
             ].filter(Boolean) as string[]
           }));
@@ -67,6 +62,11 @@ export default function ContentPage() {
       }
     }
   }, []);
+
+  // Filter problems based on active filter
+  const filteredProblems = activeFilter
+    ? problems.filter(problem => problem.tags?.includes(activeFilter))
+    : problems;
 
   const cleanSummary = (text: string) => {
     return text
@@ -86,11 +86,6 @@ export default function ContentPage() {
       .replace(/\s+/g, ' ')
       .trim();
   };
-
-  // Filter problems based on active filter
-  const filteredProblems = activeFilter
-    ? problems.filter(problem => problem.tags?.includes(activeFilter))
-    : problems;
 
   return (
     <div className="min-h-screen bg-white">
@@ -133,7 +128,7 @@ export default function ContentPage() {
               <div className="border border-black/10 rounded-lg p-8">
                 <h1 className="text-4xl font-light text-black mb-4">Content Analysis</h1>
                 <p className="text-black/70">
-                  Analysis of your website's content quality, readability, and SEO optimization.
+                  Analysis of your website's content quality, relevance, and optimization for search engines.
                   Showing {problems.length} issues ordered by impact and priority.
                 </p>
               </div>
@@ -181,11 +176,8 @@ export default function ContentPage() {
                     </div>
 
                     {/* Details Button */}
-                    <div 
-                      onClick={() => router.push(`/ai-solution/${problem.category?.toLowerCase()}/${encodeURIComponent(problem.title)}`)}
-                      className="flex items-center justify-between text-sm text-black/70 hover:text-black transition-colors group cursor-pointer"
-                    >
-                      <span className="font-light tracking-wide">SOLVE WITH AI</span>
+                    <div className="flex items-center justify-between text-sm text-black/70 hover:text-black transition-colors group cursor-pointer">
+                      <span className="font-light tracking-wide">DETAILS</span>
                       <ArrowRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
@@ -197,4 +189,4 @@ export default function ContentPage() {
       </div>
     </div>
   );
-}
+} 

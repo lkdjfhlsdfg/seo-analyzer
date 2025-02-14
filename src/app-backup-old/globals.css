@@ -1,0 +1,224 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Brand Colors */
+  --starlight-green: #2A4B3C;
+  --starlight-light: #34D399;
+  --starlight-dark: #1F3A2D;
+  --cohere-blue: #88C0D0;
+  --cohere-light: #A3D5E4;
+  --cohere-dark: #6B99A6;
+  
+  /* Surface Colors */
+  --surface-white: #FFFFFF;
+  --surface-light: #F8FAFC;
+  --surface-dark: #1A1A1A;
+  --surface-darker: #0A0A0A;
+  
+  /* Semantic Colors */
+  --success: #34D399;
+  --warning: #FBBF24;
+  --error: #EF4444;
+  --info: #88C0D0;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, var(--starlight-green) 0%, var(--cohere-blue) 100%);
+  --gradient-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  
+  /* Animations */
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Styles */
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-surface-darker text-surface-white antialiased;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+  }
+
+  ::selection {
+    @apply bg-starlight-light/30 text-surface-white;
+  }
+
+  /* Typography Scale */
+  h1, .h1 {
+    @apply font-display text-display-1 font-bold tracking-tight;
+  }
+
+  h2, .h2 {
+    @apply font-display text-display-2 font-bold tracking-tight;
+  }
+
+  h3, .h3 {
+    @apply font-display text-heading-1 font-semibold;
+  }
+
+  h4, .h4 {
+    @apply font-display text-heading-2 font-semibold;
+  }
+
+  h5, .h5 {
+    @apply font-display text-heading-3 font-medium;
+  }
+
+  p {
+    @apply text-body-base text-surface-white/80;
+  }
+
+  small {
+    @apply text-body-small text-surface-white/60;
+  }
+}
+
+/* Component Classes */
+@layer components {
+  .container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .card {
+    @apply bg-surface-dark/50 backdrop-blur-lg border border-surface-white/10 rounded-2xl p-6 transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply hover:bg-surface-dark/70 hover:border-surface-white/20 hover:shadow-glow;
+  }
+
+  .button-primary {
+    @apply bg-gradient-to-r from-starlight-green to-cohere-blue text-surface-white font-medium px-6 py-3 rounded-xl 
+           hover:shadow-glow transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .button-secondary {
+    @apply bg-surface-dark/50 backdrop-blur-lg border border-surface-white/10 text-surface-white font-medium px-6 py-3 rounded-xl
+           hover:bg-surface-dark/70 hover:border-surface-white/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .input-field {
+    @apply bg-surface-dark/30 border border-surface-white/10 rounded-xl px-4 py-3 text-surface-white placeholder-surface-white/40
+           focus:ring-2 focus:ring-starlight-light/50 focus:border-starlight-light/50 transition-all duration-300;
+  }
+
+  .nav-link {
+    @apply text-surface-white/60 hover:text-surface-white transition-colors duration-300;
+  }
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Utility Classes */
+.gradient-text {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-starlight-light to-cohere-blue;
+  background-size: 200% 200%;
+  animation: gradient 8s ease infinite;
+}
+
+.glass {
+  @apply backdrop-blur-xl bg-surface-dark/30 border border-surface-white/10;
+}
+
+.glass-hover {
+  @apply hover:bg-surface-dark/50 hover:border-surface-white/20 transition-all duration-300;
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  :root {
+    --surface-dark: #000000;
+    --surface-white: #FFFFFF;
+  }
+}
+
+/* Dark Mode Optimization */
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-surface-dark;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-surface-white/10 rounded-full hover:bg-surface-white/20 transition-colors;
+}
+
+/* Focus Styles */
+:focus-visible {
+  @apply outline-none ring-2 ring-starlight-light ring-offset-2 ring-offset-surface-darker;
+}

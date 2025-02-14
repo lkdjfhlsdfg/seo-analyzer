@@ -8,6 +8,12 @@ interface CategoryButtonProps {
   children: React.ReactNode;
 }
 
+const summaries = {
+  performance: "Analysis of your website's loading speed, responsiveness, and overall performance metrics. Showing 57 issues ordered by impact and priority.",
+  technical: "Analysis of your website's technical health including mobile-friendliness, accessibility, and crawlability. Showing 14 issues ordered by impact and priority.",
+  content: "Analysis of your website's content quality, relevance, and optimization for search engines. Showing 32 issues ordered by impact and priority."
+};
+
 function CategoryButton({ href, isActive, children }: CategoryButtonProps) {
   const router = useRouter();
 
@@ -45,40 +51,54 @@ function CategoryButton({ href, isActive, children }: CategoryButtonProps) {
 export default function CategoryNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const currentCategory = pathname.split('/')[1] as keyof typeof summaries;
 
   return (
     <div className="container mx-auto px-4">
-      <div className="flex items-center gap-8 mb-12">
-        <button 
-          onClick={() => router.push('/app')}
-          className="flex items-center justify-center w-12 h-12 rounded-lg border border-black/10 hover:bg-black/5 transition-all"
-        >
-          <ArrowLeftIcon className="w-5 h-5 text-black" />
-        </button>
+      <div className="border border-black/10 rounded-lg p-8">
+        <div className="flex items-center gap-8 mb-6">
+          <button 
+            onClick={() => router.push('/app')}
+            className="flex items-center justify-center w-12 h-12 rounded-lg border border-black/10 hover:bg-black/5 transition-all"
+          >
+            <ArrowLeftIcon className="w-5 h-5 text-black" />
+          </button>
 
-        <motion.div 
-          className="flex gap-4 flex-1"
-          layout
-        >
-          <CategoryButton 
-            href="/performance" 
-            isActive={pathname === '/performance'}
+          <motion.div 
+            className="flex gap-4 flex-1"
+            layout
           >
-            Performance
-          </CategoryButton>
-          <CategoryButton 
-            href="/technical" 
-            isActive={pathname === '/technical'}
+            <CategoryButton 
+              href="/performance" 
+              isActive={pathname === '/performance'}
+            >
+              Performance
+            </CategoryButton>
+            <CategoryButton 
+              href="/technical" 
+              isActive={pathname === '/technical'}
+            >
+              Technical
+            </CategoryButton>
+            <CategoryButton 
+              href="/content" 
+              isActive={pathname === '/content'}
+            >
+              Content
+            </CategoryButton>
+          </motion.div>
+        </div>
+
+        {/* Summary Text */}
+        {summaries[currentCategory] && (
+          <motion.p 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-black/70 font-light"
           >
-            Technical
-          </CategoryButton>
-          <CategoryButton 
-            href="/content" 
-            isActive={pathname === '/content'}
-          >
-            Content
-          </CategoryButton>
-        </motion.div>
+            {summaries[currentCategory]}
+          </motion.p>
+        )}
       </div>
     </div>
   );

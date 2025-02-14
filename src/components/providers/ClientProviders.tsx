@@ -1,7 +1,6 @@
 'use client';
 
 import { ErrorBoundary } from 'react-error-boundary';
-import { AuthProvider } from '@/lib/contexts/AuthContext';
 import { SubscriptionProvider } from '@/lib/contexts/SubscriptionContext';
 
 function ErrorFallback({ error }: { error: Error }) {
@@ -24,11 +23,9 @@ function ErrorFallback({ error }: { error: Error }) {
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <AuthProvider>
-        <SubscriptionProvider>
-          {children}
-        </SubscriptionProvider>
-      </AuthProvider>
+      <SubscriptionProvider>
+        {children}
+      </SubscriptionProvider>
     </ErrorBoundary>
   );
 } 
