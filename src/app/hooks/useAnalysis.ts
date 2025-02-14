@@ -81,18 +81,14 @@ export function useAnalysis() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ website: url }),
-      }).catch(err => {
-        throw new Error('Network error. Please check your connection and try again.');
-      });
-
-      const data = await response.json().catch(err => {
-        throw new Error('Invalid response from server. Please try again.');
       });
 
       if (!response.ok) {
-        console.error('API Response:', data);
-        throw new Error(data.error || 'Failed to analyze website. Please try again later.');
+        const errorData = await response.json().catch(() => ({ error: 'Failed to analyze website' }));
+        throw new Error(errorData.error || 'Failed to analyze website. Please try again later.');
       }
+
+      const data = await response.json();
 
       if (!data.result) {
         throw new Error('Invalid response format. Please try again.');

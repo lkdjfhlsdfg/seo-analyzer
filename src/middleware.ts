@@ -30,7 +30,7 @@ export function middleware(request: NextRequest) {
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     frame-src 'self';
-    connect-src 'self';
+    connect-src 'self' https://*.googleapis.com;
     font-src 'self';
   `.replace(/\s{2,}/g, ' ').trim();
 
