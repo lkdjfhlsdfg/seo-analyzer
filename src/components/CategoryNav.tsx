@@ -1,6 +1,7 @@
 import { useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { useEffect, useState } from 'react';
 
 interface CategoryButtonProps {
   href: string;
@@ -8,11 +9,19 @@ interface CategoryButtonProps {
   children: React.ReactNode;
 }
 
-const summaries = {
-  performance: "Analysis of your website's loading speed, responsiveness, and overall performance metrics. Showing 57 issues ordered by impact and priority.",
-  technical: "Analysis of your website's technical health including mobile-friendliness, accessibility, and crawlability. Showing 14 issues ordered by impact and priority.",
-  content: "Analysis of your website's content quality, relevance, and optimization for search engines. Showing 32 issues ordered by impact and priority."
-};
+interface Problem {
+  title: string;
+  impact: string;
+  score: number;
+  simple_summary: string;
+  recommendations: string[];
+}
+
+interface AnalysisData {
+  content: Problem[];
+  technical: Problem[];
+  performance: Problem[];
+}
 
 function CategoryButton({ href, isActive, children }: CategoryButtonProps) {
   const router = useRouter();
@@ -51,7 +60,34 @@ function CategoryButton({ href, isActive, children }: CategoryButtonProps) {
 export default function CategoryNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const currentCategory = pathname.split('/')[1] as keyof typeof summaries;
+  const currentCategory = pathname?.split('/')[1] as keyof typeof baseSummaries;
+  const [problemCounts, setProblemCounts] = useState({ performance: 0, technical: 0, content: 0 });
+
+  const baseSummaries = {
+    performance: "Analysis of your website's loading speed, responsiveness, and overall performance metrics.",
+    technical: "Analysis of your website's technical health including mobile-friendliness, accessibility, and crawlability.",
+    content: "Analysis of your website's content quality, relevance, and optimization for search engines."
+  };
+
+  useEffect(() => {
+    const storedData = localStorage.getItem('analysisData');
+    if (storedData) {
+      try {
+        const parsedData = JSON.parse(storedData) as AnalysisData;
+        setProblemCounts({
+          performance: parsedData.performance?.length || 0,
+          technical: parsedData.technical?.length || 0,
+          content: parsedData.content?.length || 0
+        });
+      } catch (error) {
+        console.error('Error parsing analysis data:', error);
+      }
+    }
+  }, []);
+
+  const getSummary = (category: keyof typeof baseSummaries) => {
+    return `${baseSummaries[category]} Showing ${problemCounts[category]} issues ordered by impact and priority.`;
+  };
 
   return (
     <div className="container mx-auto px-4">
@@ -90,13 +126,13 @@ export default function CategoryNav() {
         </div>
 
         {/* Summary Text */}
-        {summaries[currentCategory] && (
+        {currentCategory && (
           <motion.p 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-black/70 font-light"
           >
-            {summaries[currentCategory]}
+            {getSummary(currentCategory)}
           </motion.p>
         )}
       </div>

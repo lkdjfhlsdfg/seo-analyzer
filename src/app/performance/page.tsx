@@ -129,11 +129,6 @@ export default function PerformancePage() {
           </div>
 
           <div className="container mx-auto px-4">
-            <p className="text-black/70 mb-8">
-              Analysis of your website's performance metrics and loading speed.
-              Showing {problems.length} issues ordered by impact and priority.
-            </p>
-
             {/* Problem Cards Grid */}
             <div className="pb-8">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
