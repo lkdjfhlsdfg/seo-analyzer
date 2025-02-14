@@ -10,6 +10,7 @@ type ImpactLevel = 'high' | 'medium' | 'low';
 
 interface Problem {
   title: string;
+  originalTitle?: string;
   impact: ImpactLevel;
   score: number;
   simple_summary: string;
@@ -30,36 +31,44 @@ export default function TechnicalPage() {
   const router = useRouter();
 
   useEffect(() => {
+    console.log('TechnicalPage useEffect running');
     const storedData = localStorage.getItem('analysisData');
+    console.log('StoredData exists:', !!storedData);
+    
     if (storedData) {
       try {
         const parsedData = JSON.parse(storedData) as AnalysisData;
+        console.log('ParsedData:', parsedData);
+        console.log('Has technical property:', !!parsedData.technical);
+        
         if (parsedData.technical) {
+          console.log('Raw technical problems:', parsedData.technical);
           // Sort by impact and score, and add tags
-          const sortedProblems = [...parsedData.technical].sort((a, b) => {
-            const impactOrder: Record<ImpactLevel, number> = { high: 3, medium: 2, low: 1 };
-            const impactDiff = impactOrder[b.impact] - impactOrder[a.impact];
-            if (impactDiff !== 0) return impactDiff;
-            return (a.score || 0) - (b.score || 0);
-          }).map(problem => ({
-            ...problem,
-            category: 'technical',
-            originalTitle: problem.title, // Keep the original title
-            // Process title to be more concise but maintain searchability
-            title: problem.title
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, ' ')
-              .trim()
-              .split(' ')
-              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' '),
-            tags: [
-              // Add 'highest-impact' tag for high impact issues with low scores
-              problem.impact === 'high' && (problem.score || 0) < 0.5 ? 'highest-impact' : null,
-              // Add 'easy-solve' tag for issues with high scores (closer to passing)
-              (problem.score || 0) > 0.7 ? 'easy-solve' : null
-            ].filter(Boolean) as string[]
-          }));
+          const sortedProblems = [...parsedData.technical]
+            .sort((a, b) => {
+              const impactOrder: Record<ImpactLevel, number> = { high: 3, medium: 2, low: 1 };
+              const impactDiff = impactOrder[b.impact] - impactOrder[a.impact];
+              if (impactDiff !== 0) return impactDiff;
+              return (a.score || 0) - (b.score || 0);
+            })
+            .map(problem => ({
+              ...problem,
+              category: 'technical',
+              originalTitle: problem.title,
+              title: problem.title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, ' ')
+                .trim()
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' '),
+              tags: [
+                problem.impact === 'high' && (problem.score || 0) < 0.5 ? 'highest-impact' : null,
+                (problem.score || 0) > 0.7 ? 'easy-solve' : null
+              ].filter(Boolean) as string[]
+            }))
+            .filter(problem => (problem.score || 0) < 0.95); // Moved filter here and made it less aggressive
+          console.log('Processed problems:', sortedProblems);
           setProblems(sortedProblems);
         }
       } catch (error) {
@@ -128,16 +137,10 @@ export default function TechnicalPage() {
           </div>
 
           <div className="container mx-auto px-4">
-            {/* Category Summary */}
-            <div className="mb-12">
-              <div className="border border-black/10 rounded-lg p-8">
-                <h1 className="text-4xl font-light text-black mb-4">Technical Analysis</h1>
-                <p className="text-black/70">
-                  Analysis of your website's technical implementation, performance, and best practices.
-                  Showing {problems.length} issues ordered by impact and priority.
-                </p>
-              </div>
-            </div>
+            <p className="text-black/70 mb-8">
+              Analysis of your website's technical implementation, performance, and best practices.
+              Showing {problems.length} issues ordered by impact and priority.
+            </p>
 
             {/* Problem Cards Grid */}
             <div className="pb-8">
@@ -182,7 +185,7 @@ export default function TechnicalPage() {
 
                     {/* Details Button */}
                     <div 
-                      onClick={() => router.push(`/ai-solution/${problem.category?.toLowerCase()}/${encodeURIComponent(problem.title)}`)}
+                      onClick={() => router.push(`/ai-solution/${problem.category?.toLowerCase()}/${encodeURIComponent(problem.originalTitle || problem.title)}`)}
                       className="flex items-center justify-between text-sm text-black/70 hover:text-black transition-colors group cursor-pointer"
                     >
                       <span className="font-light tracking-wide">SOLVE WITH AI</span>

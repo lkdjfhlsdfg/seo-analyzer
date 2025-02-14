@@ -10,6 +10,7 @@ type ImpactLevel = 'high' | 'medium' | 'low';
 
 interface Problem {
   title: string;
+  originalTitle?: string;
   impact: ImpactLevel;
   score: number;
   simple_summary: string;
@@ -128,6 +129,11 @@ export default function PerformancePage() {
           </div>
 
           <div className="container mx-auto px-4">
+            <p className="text-black/70 mb-8">
+              Analysis of your website's performance metrics and loading speed.
+              Showing {problems.length} issues ordered by impact and priority.
+            </p>
+
             {/* Problem Cards Grid */}
             <div className="pb-8">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -171,7 +177,7 @@ export default function PerformancePage() {
 
                     {/* Details Button */}
                     <div 
-                      onClick={() => router.push(`/ai-solution/${problem.category?.toLowerCase()}/${encodeURIComponent(problem.title)}`)}
+                      onClick={() => router.push(`/ai-solution/${problem.category?.toLowerCase()}/${encodeURIComponent(problem.originalTitle || problem.title)}`)}
                       className="flex items-center justify-between text-sm text-black/70 hover:text-black transition-colors group cursor-pointer"
                     >
                       <span className="font-light tracking-wide">SOLVE WITH AI</span>

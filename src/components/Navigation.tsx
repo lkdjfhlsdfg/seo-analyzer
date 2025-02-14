@@ -135,6 +135,16 @@ export default function Navigation() {
                 </Link>
               )}
             </div>
+
+            <button
+              onClick={() => {
+                localStorage.clear();
+                alert('Analysis data cleared! Please run a new analysis.');
+              }}
+              className="px-4 py-2 text-sm text-black/70 hover:text-black transition-colors"
+            >
+              Clear Data
+            </button>
           </div>
         </div>
       </div>

@@ -10,6 +10,7 @@ type ImpactLevel = 'high' | 'medium' | 'low';
 
 interface Problem {
   title: string;
+  originalTitle?: string;
   impact: ImpactLevel;
   score: number;
   simple_summary: string;
@@ -128,16 +129,10 @@ export default function ContentPage() {
           </div>
 
           <div className="container mx-auto px-4">
-            {/* Category Summary */}
-            <div className="mb-12">
-              <div className="border border-black/10 rounded-lg p-8">
-                <h1 className="text-4xl font-light text-black mb-4">Content Analysis</h1>
-                <p className="text-black/70">
-                  Analysis of your website's content quality, readability, and SEO optimization.
-                  Showing {problems.length} issues ordered by impact and priority.
-                </p>
-              </div>
-            </div>
+            <p className="text-black/70 mb-8">
+              Analysis of your website's content quality, readability, and SEO optimization.
+              Showing {problems.length} issues ordered by impact and priority.
+            </p>
 
             {/* Problem Cards Grid */}
             <div className="pb-8">
@@ -182,7 +177,7 @@ export default function ContentPage() {
 
                     {/* Details Button */}
                     <div 
-                      onClick={() => router.push(`/ai-solution/${problem.category?.toLowerCase()}/${encodeURIComponent(problem.title)}`)}
+                      onClick={() => router.push(`/ai-solution/${problem.category?.toLowerCase()}/${encodeURIComponent(problem.originalTitle || problem.title)}`)}
                       className="flex items-center justify-between text-sm text-black/70 hover:text-black transition-colors group cursor-pointer"
                     >
                       <span className="font-light tracking-wide">SOLVE WITH AI</span>

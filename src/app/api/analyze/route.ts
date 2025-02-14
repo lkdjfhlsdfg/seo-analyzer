@@ -246,7 +246,19 @@ export async function POST(req: Request) {
     }
 
     const data = await response.json();
-    console.log('PageSpeed API response received');
+    console.log('DEBUG - PageSpeed API raw response:', {
+      hasLighthouseResult: !!data.lighthouseResult,
+      categories: data.lighthouseResult?.categories ? Object.keys(data.lighthouseResult.categories) : [],
+      audits: data.lighthouseResult?.audits ? Object.keys(data.lighthouseResult.audits).length : 0
+    });
+    
+    if (!data.lighthouseResult) {
+      console.error('PageSpeed API did not return a lighthouseResult');
+      return NextResponse.json(
+        { error: 'Failed to analyze website. Please try again.' },
+        { status: 500 }
+      );
+    }
 
     // Process the results
     const result = {
@@ -296,7 +308,11 @@ function processAudits(audits: any, category: string) {
         return audit.id.includes('seo') || audit.id.includes('meta') || audit.id.includes('description');
       }
       if (category === 'best-practices') {
-        return audit.id.includes('best-practices') || audit.id.includes('security');
+        return audit.id.includes('best-practices') || 
+               audit.id.includes('security') ||
+               audit.id.includes('accessibility') ||
+               audit.id.includes('errors') ||
+               !audit.id.includes('seo'); // Include other audits that aren't explicitly SEO
       }
       return false;
     })
