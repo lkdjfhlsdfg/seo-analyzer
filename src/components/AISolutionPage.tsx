@@ -45,27 +45,47 @@ export default function AISolutionPage({ params }: { params: { category: string;
 
   useEffect(() => {
     const storedData = localStorage.getItem('analysisData');
+    console.log('=== DEBUG: Analysis Data ===');
     console.log('Category:', params.category);
-    console.log('Title:', decodeURIComponent(params.title));
-    console.log('Raw stored data:', storedData);
+    console.log('Raw Title from URL:', params.title);
+    console.log('Decoded Title:', decodeURIComponent(params.title));
+    console.log('Raw stored data exists:', !!storedData);
     
     if (storedData) {
       try {
         const data = JSON.parse(storedData) as AnalysisData;
-        console.log('Performance problems:', JSON.stringify(data.performance, null, 2));
+        console.log('=== DEBUG: Performance Problems ===');
+        console.log('All performance problems:', data.performance?.map(p => p.title));
         
         const categoryProblems = data[params.category as keyof AnalysisData] || [];
         console.log(`Found ${categoryProblems.length} problems in category ${params.category}`);
         
         const decodedTitle = decodeURIComponent(params.title);
+        console.log('=== DEBUG: Title Matching ===');
         console.log('Looking for title:', decodedTitle);
         
-        const normalizedSearchTitle = decodedTitle.toLowerCase().replace(/-/g, ' ');
+        const normalizeTitle = (title: string) => {
+          return title
+            .toLowerCase()
+            .replace(/-/g, ' ')
+            .replace(/`/g, '') // Remove backticks
+            .replace(/\s+/g, ' ') // Normalize multiple spaces
+            .trim();
+        };
+        
+        const normalizedSearchTitle = normalizeTitle(decodedTitle);
+        console.log('Normalized search title:', normalizedSearchTitle);
+        
+        console.log('Available normalized titles:');
+        categoryProblems.forEach(p => {
+          const normalizedProblemTitle = normalizeTitle(p.title);
+          console.log(`- "${normalizedProblemTitle}"`);
+        });
         
         const foundProblem = categoryProblems.find(p => {
-          const normalizedProblemTitle = p.title.toLowerCase().replace(/-/g, ' ');
+          const normalizedProblemTitle = normalizeTitle(p.title);
           const matches = normalizedProblemTitle === normalizedSearchTitle;
-          console.log(`Comparing normalized "${normalizedProblemTitle}" with "${normalizedSearchTitle}"`, matches);
+          console.log(`Comparing: "${normalizedProblemTitle}" with "${normalizedSearchTitle}" = ${matches}`);
           return matches;
         });
         
